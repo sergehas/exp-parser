@@ -52,6 +52,11 @@ export default defineConfig([
   },
   {
     files: ["**/*.spec.ts"],
+    languageOptions: {
+      globals: {
+        ...globals.jest,
+      },
+    },
     rules: {
       "@typescript-eslint/no-explicit-any": "off",
     },

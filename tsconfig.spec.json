@@ -2,8 +2,8 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "outDir": "./out-tsc/spec",
-    "types": ["jasmine", "node"],
+    "outDir": "./out/spec",
+    "types": ["jest", "node"],
     "resolveJsonModule": true,
     "esModuleInterop": true
   },

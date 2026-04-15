@@ -8,6 +8,11 @@ export enum BinaryOperator {
   Or = "OR",
 }
 
+export enum VariableSign {
+  Equals = "+",
+  NotEquals = "-",
+}
+
 export interface SourceSpan {
   readonly start: number;
   readonly end: number;
@@ -15,7 +20,9 @@ export interface SourceSpan {
 
 export interface VariableExpr {
   readonly kind: ExprKind.Variable;
-  readonly name: string;
+  readonly sign: VariableSign;
+  readonly code: string;
+  readonly value: string;
   readonly span: SourceSpan;
 }
 
@@ -51,10 +58,12 @@ export enum NormalForm {
   Cnf = "CNF",
 }
 
+/** Type guard: checks if an expression is a VariableExpr. */
 export function isVariableExpr(expr: BoolExpr): expr is VariableExpr {
   return expr.kind === ExprKind.Variable;
 }
 
+/** Type guard: checks if an expression is a BinaryExpr. */
 export function isBinaryExpr(expr: BoolExpr): expr is BinaryExpr {
   return expr.kind === ExprKind.Binary;
 }

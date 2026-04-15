@@ -1,4 +1,11 @@
 import {
+  canonicalizeExpression,
+  expressionKey,
+  extractTerms,
+  maxDepth,
+  nodeCount,
+} from "./normalize";
+import {
   BinaryOperator,
   BoolExpr,
   ExprKind,
@@ -8,13 +15,6 @@ import {
   SourceSpan,
   isBinaryExpr,
 } from "./types";
-import {
-  canonicalizeExpression,
-  expressionKey,
-  extractTerms,
-  maxDepth,
-  nodeCount,
-} from "./normalize";
 
 interface MutableRewriteStats {
   rewrites: number;
@@ -26,9 +26,7 @@ const DEFAULT_LIMITS: Required<RewriteLimits> = {
   maxRewrites: 2000,
 };
 
-/**
- * Expands a boolean expression toward DNF or CNF using distribution rules.
- */
+/** Expands a boolean expression toward DNF or CNF using distribution rules. */
 export function expandExpression(
   expression: BoolExpr,
   form: NormalForm,
@@ -54,20 +52,14 @@ export function expandExpression(
   };
 }
 
-/**
- * Factorizes by extracting common terms on OR-of-AND or AND-of-OR shapes.
- */
+/** Factorizes by extracting common terms on OR-of-AND or AND-of-OR shapes. */
 export function factorizeExpression(
   expression: BoolExpr,
   limits: RewriteLimits = DEFAULT_LIMITS
 ): { expression: BoolExpr; stats: RewriteStats } {
   const effectiveLimits = { ...DEFAULT_LIMITS, ...limits };
   const stats: MutableRewriteStats = { rewrites: 0 };
-  const result = factorizeRecursive(
-    canonicalizeExpression(expression),
-    effectiveLimits,
-    stats
-  );
+  const result = factorizeRecursive(canonicalizeExpression(expression), effectiveLimits, stats);
   const normalized = canonicalizeExpression(result);
   assertLimits(normalized, effectiveLimits, stats);
   return {
@@ -79,6 +71,10 @@ export function factorizeExpression(
     },
   };
 }
+
+// ---------------------------------------------------------------------------
+// Expand internals
+// ---------------------------------------------------------------------------
 
 function expandRecursive(
   expression: BoolExpr,
@@ -93,11 +89,7 @@ function expandRecursive(
 
   const left = expandRecursive(expression.left, form, limits, stats);
   const right = expandRecursive(expression.right, form, limits, stats);
-  const node: BoolExpr = {
-    ...expression,
-    left,
-    right,
-  };
+  const node: BoolExpr = { ...expression, left, right };
 
   if (form === NormalForm.Dnf && isBinaryExpr(node) && node.operator === BinaryOperator.And) {
     if (isBinaryExpr(left) && left.operator === BinaryOperator.Or) {
@@ -202,6 +194,10 @@ function expandRecursive(
   return node;
 }
 
+// ---------------------------------------------------------------------------
+// Factorize internals
+// ---------------------------------------------------------------------------
+
 function factorizeRecursive(
   expression: BoolExpr,
   limits: Required<RewriteLimits>,
@@ -214,11 +210,7 @@ function factorizeRecursive(
 
   const left = factorizeRecursive(expression.left, limits, stats);
   const right = factorizeRecursive(expression.right, limits, stats);
-  const current = canonicalizeExpression({
-    ...expression,
-    left,
-    right,
-  });
+  const current = canonicalizeExpression({ ...expression, left, right });
   if (!isBinaryExpr(current)) {
     return current;
   }
@@ -265,8 +257,10 @@ function factorizeOuter(
   }
 
   const best = [...frequency.values()]
-    .filter((value) => value.count >= 2)
-    .sort((a, b) => b.count - a.count || expressionKey(a.expr).localeCompare(expressionKey(b.expr)))[0];
+    .filter((v) => v.count >= 2)
+    .sort(
+      (a, b) => b.count - a.count || expressionKey(a.expr).localeCompare(expressionKey(b.expr))
+    )[0];
   if (best === undefined) {
     return null;
   }
@@ -277,7 +271,7 @@ function factorizeOuter(
 
   for (const term of terms) {
     const factors = extractTerms(term, innerOperator);
-    const remaining = factors.filter((factor) => expressionKey(factor) !== commonKey);
+    const remaining = factors.filter((f) => expressionKey(f) !== commonKey);
     const hasCommonFactor = remaining.length !== factors.length;
     if (!hasCommonFactor) {
       otherTerms.push(term);
@@ -312,6 +306,10 @@ function factorizeOuter(
 
   return buildChain([...otherTerms, factoredGroup], outerOperator);
 }
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
 function buildChain(terms: readonly BoolExpr[], operator: BinaryOperator): BoolExpr {
   const [first, ...rest] = terms;
@@ -358,13 +356,8 @@ function assertLimits(
   assertRewriteLimit(limits, stats);
 }
 
-function assertRewriteLimit(
-  limits: Required<RewriteLimits>,
-  stats: MutableRewriteStats
-): void {
+function assertRewriteLimit(limits: Required<RewriteLimits>, stats: MutableRewriteStats): void {
   if (stats.rewrites > limits.maxRewrites) {
-    throw new Error(
-      `Transformation exceeded maxRewrites (${limits.maxRewrites}).`
-    );
+    throw new Error(`Transformation exceeded maxRewrites (${limits.maxRewrites}).`);
   }
 }
