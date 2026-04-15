@@ -5,11 +5,18 @@ import { NormalForm } from "../dsl/types";
 import { logger } from "../services/utils/logger";
 import { AbstractController, AbstractControllerContext } from "./abstractController";
 
+/** Context for parse request handling, including the expression to parse. */
 export interface ParseContext extends AbstractControllerContext {
   expression: string;
 }
 
+/** Controller that parses boolean expressions and outputs their transformations. */
 export class ParseController extends AbstractController<ParseContext> {
+  /**
+   * Parses the configured expression and logs parse output, expansion, and factorization results.
+   *
+   * @returns Promise that resolves when logging and processing are complete.
+   */
   override async handleRequest(): Promise<void> {
     const input = this.context.expression;
     logger.info(`Input expression: ${input}`);

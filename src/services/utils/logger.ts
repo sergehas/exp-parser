@@ -24,9 +24,10 @@ export const customLevels = {
 };
 
 /**
- * Return date formatted for display
- * @param date
- * @returns {string}
+ * Formats a date-like value for logger output.
+ *
+ * @param date Input timestamp value.
+ * @returns Formatted ISO-like date/time string.
  */
 const formatDateLog = (date: Date | string | number) => {
   return `${new Date(date).toISOString().split("T")[0]} ${
@@ -58,6 +59,13 @@ const loggerOptions = {
 winston.addColors(customLevels.colors);
 export const logger = winston.createLogger(loggerOptions) as winston.Logger &
   Record<keyof (typeof customLevels)["levels"], winston.LeveledLogMethod>;
+
+/**
+ * Sets the logger level from numeric CLI verbosity.
+ *
+ * @param verbose Numeric verbosity value.
+ * @returns Active logger level name.
+ */
 export const setLogLevel = (verbose: number): string => {
   logger.level =
     Object.keys(customLevels.levels).find((k) => customLevels.levels[k] === verbose) || "info";

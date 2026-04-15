@@ -1,6 +1,7 @@
 import { SyntaxMode } from "./detect";
 import { ParseDiagnostic, VariableSign } from "./types";
 
+/** Token categories in the lexer output. */
 export enum TokenType {
   Variable = "Variable",
   And = "And",
@@ -11,6 +12,7 @@ export enum TokenType {
   Eof = "Eof",
 }
 
+/** A single token with type, optional variable components, and source location. */
 export interface Token {
   readonly type: TokenType;
   readonly sign?: VariableSign;
@@ -20,6 +22,7 @@ export interface Token {
   readonly end: number;
 }
 
+/** Result of tokenization, containing tokens and any parsing diagnostics. */
 export interface LexResult {
   readonly tokens: readonly Token[];
   readonly diagnostics: readonly ParseDiagnostic[];
@@ -31,23 +34,31 @@ const VARIABLE_PATTERN = /[+-][A-Za-z0-9]{4,5}/y;
 /**
  * Parses a sign+code+value token string into its components.
  * The raw string must be 5-6 chars: [+-] + 3-char code + 1-2 char value.
+ *
+ * @param raw Variable token text in condensed form.
+ * @returns Parsed sign, code, and value segments.
  */
 function parseVariable(raw: string): { sign: VariableSign; code: string; value: string } {
-  const sign = raw[0] === "+" ? VariableSign.Equals : VariableSign.NotEquals;
+  const sign = raw.startsWith("+") ? VariableSign.Equals : VariableSign.NotEquals;
   const body = raw.slice(1).toUpperCase();
   const code = body.slice(0, 3);
   const value = body.slice(3);
   return { sign, code, value };
 }
 
-/** Tokenizes the input in explicit mode. */
+/**
+ * Tokenizes input using explicit syntax rules (keywords and parentheses supported).
+ *
+ * @param input Raw expression text.
+ * @returns Tokens and diagnostics produced during explicit-mode lexing.
+ */
 function tokenizeExplicit(input: string): LexResult {
   const tokens: Token[] = [];
   const diagnostics: ParseDiagnostic[] = [];
   let index = 0;
 
   while (index < input.length) {
-    const ch = input[index]!;
+    const ch = input[index];
 
     if (/\s/.test(ch)) {
       index += 1;
@@ -69,7 +80,7 @@ function tokenizeExplicit(input: string): LexResult {
     KEYWORD_PATTERN.lastIndex = index;
     const kwMatch = KEYWORD_PATTERN.exec(input);
     if (kwMatch) {
-      const raw = kwMatch[0]!;
+      const raw = kwMatch[0];
       const upper = raw.toUpperCase();
       tokens.push({
         type: upper === "AND" ? TokenType.And : TokenType.Or,
@@ -83,7 +94,7 @@ function tokenizeExplicit(input: string): LexResult {
     VARIABLE_PATTERN.lastIndex = index;
     const varMatch = VARIABLE_PATTERN.exec(input);
     if (varMatch) {
-      const raw = varMatch[0]!;
+      const raw = varMatch[0];
       const { sign, code, value } = parseVariable(raw);
       tokens.push({
         type: TokenType.Variable,
@@ -108,7 +119,12 @@ function tokenizeExplicit(input: string): LexResult {
   return { tokens, diagnostics };
 }
 
-/** Tokenizes the input in condensed mode. */
+/**
+ * Tokenizes input using condensed syntax rules (line-based conjunction/disjunction input).
+ *
+ * @param input Raw expression text.
+ * @returns Tokens and diagnostics produced during condensed-mode lexing.
+ */
 function tokenizeCondensed(input: string): LexResult {
   const tokens: Token[] = [];
   const diagnostics: ParseDiagnostic[] = [];
@@ -116,7 +132,7 @@ function tokenizeCondensed(input: string): LexResult {
   let lineHasTokens = false;
 
   while (index < input.length) {
-    const ch = input[index]!;
+    const ch = input[index];
 
     // Handle newlines (\r\n or \n)
     if (ch === "\r" || ch === "\n") {
@@ -142,7 +158,7 @@ function tokenizeCondensed(input: string): LexResult {
     VARIABLE_PATTERN.lastIndex = index;
     const varMatch = VARIABLE_PATTERN.exec(input);
     if (varMatch) {
-      const raw = varMatch[0]!;
+      const raw = varMatch[0];
       const { sign, code, value } = parseVariable(raw);
       tokens.push({
         type: TokenType.Variable,
@@ -168,7 +184,13 @@ function tokenizeCondensed(input: string): LexResult {
   return { tokens, diagnostics };
 }
 
-/** Lexes a boolean expression into tokens with source locations. */
+/**
+ * Lexes a boolean expression into tokens with source locations.
+ *
+ * @param input Raw expression text.
+ * @param mode Syntax mode used to choose explicit or condensed tokenization rules.
+ * @returns Token stream and diagnostics gathered during lexing.
+ */
 export function tokenize(input: string, mode: SyntaxMode): LexResult {
   return mode === SyntaxMode.Explicit ? tokenizeExplicit(input) : tokenizeCondensed(input);
 }

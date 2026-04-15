@@ -1,36 +1,45 @@
-# Sonarqube Report Generator: Copilot Instructions
+# Boolean Expression Parser: Copilot Instructions
 
-## Project Architecture & Data Flow
+## Project Overview
 
-- The project generates code quality reports from Sonarqube and GitHub PRs, supporting multiple output formats (JSON, Markdown, CSV, XLSX).
-- Main entry points: `src/main.ts` (Sonarqube reports) and `src/main.gh.ts` (GitHub reports).
-- Core services:
-  - `src/services/data/SonarqubeService.ts`: Fetches and processes Sonarqube data, handles authentication via environment variables or CLI args.
-  - `src/services/data/ReportService.ts`: Aggregates and flattens report data for rendering.
-- Data model: See `src/models/models.ts` for `Report`, `Module`, `Branch`, and `Metrics` types.
+CLI parser for boolean expressions in condensed and explicit syntaxes. It builds an AST and outputs parsed, expanded, and factorized forms.
+
+- Main entry point: `src/main.ts`
+- Core parse flow: input expression -> syntax detection -> tokenization -> parsing -> normalize/transform -> logger output
+
+## Architecture & Data Flow
+
+- Parse pipeline: input expression -> syntax detect -> tokenize -> parse -> normalize/transform -> logger output
+- `src/services/utils/cli.ts`: command parsing and input resolution (`-e` inline expression, `-f` file input)
+- `src/controllers/ParseController.ts`: orchestration for parsing and transformations
+- `src/dsl/detect.ts`: syntax detection (condensed vs explicit)
+- `src/dsl/lexer.ts`: tokenization
+- `src/dsl/parser.ts`: expression parsing and stringify helpers
+- `src/dsl/normalize.ts`: canonicalization and term normalization helpers
+- `src/dsl/transform.ts`: expression expansion and factorization
+- `src/services/utils/logger.ts`: Winston logger and verbosity control
 
 ## Developer Workflows
 
-- **Install:**
-  - `npm i` (Node >= 16 required)
-- **Run:**
-  - Use CLI: `npx ts-node .\src\main.ts `
-- **Debug:**
-  - VS Code launch config uses `src/main.ts` with runtime args and environment variables.
-- **Build:**
-  - TypeScript compilation via `tsc` (see `tsconfig.json`).
-- **Test:**
-  - Jest is used for unit tests (see `jest.config.js`).
+- Install: `npm i` (Node >= 22)
+- Run help: `npx ts-node .\src\main.ts -h`
+- Parse inline expression: `npx ts-node .\src\main.ts parse -e "+ABC01 and -XYZ02"`
+- Parse from file: `npx ts-node .\src\main.ts parse -f .\expr.txt`
+- Increase verbosity: add `-v` up to `-vvvvv`
+- Start script: `npm start`
+- Build: `npm run build`
+- Test: `npm test`
+- Coverage: `npm run test:coverage`
+- Lint: `npm run lint`
+- Lint with fixes: `npm run lint:fix`
 
-## Coding Conventions & Patterns
+## Coding Guidance Source of Truth
 
-- TypeScript is required for all new code.
-- Use interfaces for data structures; prefer immutable data (`const`, `readonly`).
-- Use optional chaining (`?.`) and nullish coalescing (`??`).
-- Avoid `any`; use `unknown` if type is not known.
-- Renderer pattern: Add new output formats by extending `RendererService` and updating `buildRenderers`.
+- General standards: `.github/instructions/general-coding.instructions.md`
+- TypeScript standards: `.github/instructions/typescript-coding.instructions.md`
 
+Keep this file focused on project architecture and workflows. Place language-specific implementation rules in the corresponding instruction file.
 
 ---
 
-For more details, see `README.md` and coding standards in `.github/instructions/`.
+For command examples and CLI behavior details, see `README.md`.

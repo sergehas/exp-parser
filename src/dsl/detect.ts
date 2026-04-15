@@ -1,3 +1,4 @@
+/** Supported syntax modes for parsing boolean expressions. */
 export enum SyntaxMode {
   Condensed = "Condensed",
   Explicit = "Explicit",
@@ -5,7 +6,12 @@ export enum SyntaxMode {
 
 const EXPLICIT_PATTERN = /\b(and|or)\b|[()]/i;
 
-/** Auto-detect whether the input uses condensed or explicit syntax. */
+/**
+ * Detects whether input is written in condensed or explicit boolean syntax.
+ *
+ * @param input Expression text to inspect.
+ * @returns Explicit mode when boolean keywords or parentheses are present; otherwise condensed mode.
+ */
 export function detectSyntax(input: string): SyntaxMode {
   return EXPLICIT_PATTERN.test(input) ? SyntaxMode.Explicit : SyntaxMode.Condensed;
 }

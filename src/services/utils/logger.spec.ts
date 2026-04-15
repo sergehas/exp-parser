@@ -24,9 +24,10 @@ describe("customLevels", () => {
 
 describe("logger", () => {
   it("should have all custom log levels as methods", () => {
-    Object.keys(customLevels.levels).forEach((level) => {
-      expect(typeof (logger as any)[level]).toBe("function");
-    });
+    const levelKeys = Object.keys(customLevels.levels);
+    for (const level of levelKeys) {
+      expect(typeof (logger as Record<string, unknown>)[level]).toBe("function");
+    }
   });
 
   it("should log messages at different levels", () => {

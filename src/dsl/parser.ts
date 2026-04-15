@@ -10,6 +10,7 @@ import {
   isBinaryExpr,
 } from "./types";
 
+/** Result of parsing an expression string, containing the AST or null on error. */
 export interface ParseResult {
   readonly expression: BoolExpr | null;
   readonly diagnostics: readonly ParseDiagnostic[];
@@ -29,21 +30,38 @@ const PRECEDENCE: Readonly<Record<TokenType, number>> = {
   [TokenType.Eof]: 0,
 };
 
+/** Parser for explicit-syntax token streams based on Pratt parsing. */
 class ExplicitParser {
   private readonly _tokens: readonly Token[];
   private readonly _diagnostics: ParseDiagnostic[];
   private _index: number;
 
+  /**
+   * Creates an explicit-mode parser instance.
+   *
+   * @param tokens Lexer token stream.
+   * @param diagnostics Diagnostic sink shared with caller.
+   */
   constructor(tokens: readonly Token[], diagnostics: ParseDiagnostic[]) {
     this._tokens = tokens;
     this._diagnostics = diagnostics;
     this._index = 0;
   }
 
+  /**
+   * Exposes parser diagnostics accumulated during parsing.
+   *
+   * @returns Current diagnostic collection.
+   */
   get diagnostics(): readonly ParseDiagnostic[] {
     return this._diagnostics;
   }
 
+  /**
+   * Parses a full explicit expression from tokens.
+   *
+   * @returns Parsed expression or null when diagnostics were produced.
+   */
   parse(): BoolExpr | null {
     const expression = this.parseExpression(0);
     if (expression === null) {
@@ -62,6 +80,12 @@ class ExplicitParser {
     return expression;
   }
 
+  /**
+   * Parses an expression using Pratt parsing and precedence climbing.
+   *
+   * @param minBindingPower Minimum binding power required to continue parsing.
+   * @returns Parsed expression subtree or null on error.
+   */
   private parseExpression(minBindingPower: number): BoolExpr | null {
     let left = this.parsePrefix();
     if (left === null) {
@@ -98,6 +122,11 @@ class ExplicitParser {
     return left;
   }
 
+  /**
+   * Parses prefix expressions (variable or parenthesized expression).
+   *
+   * @returns Prefix expression node or null on error.
+   */
   private parsePrefix(): BoolExpr | null {
     const token = this.current();
 
@@ -143,10 +172,16 @@ class ExplicitParser {
     return null;
   }
 
+  /**
+   * Returns the current parser token.
+   *
+   * @returns Current token, or final token as a safe fallback.
+   */
   private current(): Token {
-    return this._tokens[this._index] ?? this._tokens[this._tokens.length - 1]!;
+    return this._tokens[this._index] ?? this._tokens.at(-1);
   }
 
+  /** Advances parser position to the next token when possible. */
   private advance(): void {
     if (this._index < this._tokens.length - 1) {
       this._index += 1;
@@ -158,6 +193,13 @@ class ExplicitParser {
 // Line-based parser for condensed syntax
 // ---------------------------------------------------------------------------
 
+/**
+ * Parses condensed-mode tokens where each line is an AND-chain and lines are OR'ed.
+ *
+ * @param tokens Token stream from the lexer.
+ * @param diagnostics Diagnostic sink for parse errors.
+ * @returns Parsed expression or null on invalid input.
+ */
 function parseCondensed(tokens: readonly Token[], diagnostics: ParseDiagnostic[]): BoolExpr | null {
   const lines: Token[][] = [];
   let current: Token[] = [];
@@ -201,7 +243,7 @@ function parseCondensed(tokens: readonly Token[], diagnostics: ParseDiagnostic[]
   }
 
   if (lineExprs.length === 1) {
-    return lineExprs[0]!;
+    return lineExprs[0];
   }
 
   const [first, ...rest] = lineExprs;
@@ -213,10 +255,16 @@ function parseCondensed(tokens: readonly Token[], diagnostics: ParseDiagnostic[]
       right: cur,
       span: mergeSpan(acc.span, cur.span),
     }),
-    first!
+    first
   );
 }
 
+/**
+ * Builds an AND-only expression chain from variable tokens.
+ *
+ * @param tokens Tokens representing one condensed line.
+ * @returns AND-chained expression or null when no tokens are present.
+ */
 function buildAndChain(tokens: Token[]): BoolExpr | null {
   if (tokens.length === 0) {
     return null;
@@ -239,7 +287,7 @@ function buildAndChain(tokens: Token[]): BoolExpr | null {
       right: cur,
       span: mergeSpan(acc.span, cur.span),
     }),
-    first!
+    first
   );
 }
 
@@ -247,7 +295,12 @@ function buildAndChain(tokens: Token[]): BoolExpr | null {
 // Public API
 // ---------------------------------------------------------------------------
 
-/** Parses a boolean condition expression, auto-detecting the syntax mode. */
+/**
+ * Parses a boolean condition expression and auto-detects the syntax mode.
+ *
+ * @param input Expression text in either condensed or explicit syntax.
+ * @returns Parse result containing the AST on success, or null expression with diagnostics on failure.
+ */
 export function parseExpression(input: string): ParseResult {
   const mode = detectSyntax(input);
   const lex = tokenize(input, mode);
@@ -269,17 +322,38 @@ export function parseExpression(input: string): ParseResult {
 // Stringify
 // ---------------------------------------------------------------------------
 
-/** Serializes a BoolExpr back to string in the requested syntax mode. */
+/**
+ * Serializes a boolean expression AST back into text.
+ *
+ * @param expression Expression tree to serialize.
+ * @param mode Output syntax mode.
+ * @returns Stringified expression in explicit infix form or condensed multiline form.
+ */
 export function stringifyExpression(expression: BoolExpr, mode: SyntaxMode): string {
   return mode === SyntaxMode.Explicit
     ? stringifyExplicit(expression, 0)
     : stringifyCondensed(expression);
 }
 
+/**
+ * Formats a variable expression as sign+code+value text.
+ *
+ * @param sign Variable sign marker.
+ * @param code Variable code segment.
+ * @param value Variable value segment.
+ * @returns Serialized variable token text.
+ */
 function variableToString(sign: VariableSign, code: string, value: string): string {
   return `${sign}${code.toUpperCase()}${value.toUpperCase()}`;
 }
 
+/**
+ * Stringifies an expression in explicit infix notation.
+ *
+ * @param expression Expression subtree to stringify.
+ * @param parentPrecedence Parent precedence used for parenthesis decisions.
+ * @returns Stringified explicit expression.
+ */
 function stringifyExplicit(expression: BoolExpr, parentPrecedence: number): string {
   if (!isBinaryExpr(expression)) {
     return variableToString(expression.sign, expression.code, expression.value);
@@ -296,6 +370,12 @@ function stringifyExplicit(expression: BoolExpr, parentPrecedence: number): stri
   return content;
 }
 
+/**
+ * Stringifies an expression in condensed multiline syntax.
+ *
+ * @param expression Expression to stringify.
+ * @returns Condensed string where lines represent OR terms.
+ */
 function stringifyCondensed(expression: BoolExpr): string {
   const orTerms = collectBinaryTerms(expression, BinaryOperator.Or);
   const lines = orTerms.map((term) => {
@@ -313,6 +393,13 @@ function stringifyCondensed(expression: BoolExpr): string {
   return lines.join("\n");
 }
 
+/**
+ * Collects all terms connected by a matching binary operator.
+ *
+ * @param expression Expression to flatten.
+ * @param operator Operator to flatten by.
+ * @returns Flat list of collected terms.
+ */
 function collectBinaryTerms(expression: BoolExpr, operator: BinaryOperator): BoolExpr[] {
   if (!isBinaryExpr(expression) || expression.operator !== operator) {
     return [expression];
@@ -327,6 +414,13 @@ function collectBinaryTerms(expression: BoolExpr, operator: BinaryOperator): Boo
 // Helpers
 // ---------------------------------------------------------------------------
 
+/**
+ * Merges two spans into the smallest span that contains both.
+ *
+ * @param left Left span.
+ * @param right Right span.
+ * @returns Merged enclosing span.
+ */
 function mergeSpan(left: SourceSpan, right: SourceSpan): SourceSpan {
   return {
     start: Math.min(left.start, right.start),

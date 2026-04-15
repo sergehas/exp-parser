@@ -9,9 +9,9 @@ describe("parseExpression — condensed syntax", () => {
     expect(result.expression).not.toBeNull();
     expect(result.expression!.kind).toBe(ExprKind.Variable);
     if (isVariableExpr(result.expression!)) {
-      expect(result.expression!.sign).toBe(VariableSign.Equals);
-      expect(result.expression!.code).toBe("ABC");
-      expect(result.expression!.value).toBe("01");
+      expect(result.expression.sign).toBe(VariableSign.Equals);
+      expect(result.expression.code).toBe("ABC");
+      expect(result.expression.value).toBe("01");
     }
   });
 
@@ -21,7 +21,7 @@ describe("parseExpression — condensed syntax", () => {
     expect(result.expression).not.toBeNull();
     expect(isBinaryExpr(result.expression!)).toBe(true);
     if (isBinaryExpr(result.expression!)) {
-      expect(result.expression!.operator).toBe(BinaryOperator.And);
+      expect(result.expression.operator).toBe(BinaryOperator.And);
     }
   });
 
@@ -30,7 +30,7 @@ describe("parseExpression — condensed syntax", () => {
     expect(result.diagnostics).toHaveLength(0);
     expect(result.expression).not.toBeNull();
     if (isBinaryExpr(result.expression!)) {
-      expect(result.expression!.operator).toBe(BinaryOperator.Or);
+      expect(result.expression.operator).toBe(BinaryOperator.Or);
     }
   });
 
@@ -40,11 +40,11 @@ describe("parseExpression — condensed syntax", () => {
     expect(result.expression).not.toBeNull();
     // Top-level should be OR (two lines)
     if (isBinaryExpr(result.expression!)) {
-      expect(result.expression!.operator).toBe(BinaryOperator.Or);
+      expect(result.expression.operator).toBe(BinaryOperator.Or);
       // Left should be AND chain of 3 variables
-      expect(isBinaryExpr(result.expression!.left)).toBe(true);
+      expect(isBinaryExpr(result.expression.left)).toBe(true);
       // Right should be AND chain of 2 variables
-      expect(isBinaryExpr(result.expression!.right)).toBe(true);
+      expect(isBinaryExpr(result.expression.right)).toBe(true);
     }
   });
 
@@ -53,7 +53,7 @@ describe("parseExpression — condensed syntax", () => {
     expect(result.diagnostics).toHaveLength(0);
     expect(result.expression).not.toBeNull();
     if (isBinaryExpr(result.expression!)) {
-      expect(result.expression!.operator).toBe(BinaryOperator.Or);
+      expect(result.expression.operator).toBe(BinaryOperator.Or);
     }
   });
 
@@ -70,7 +70,7 @@ describe("parseExpression — explicit syntax", () => {
     expect(result.diagnostics).toHaveLength(0);
     expect(result.expression).not.toBeNull();
     if (isBinaryExpr(result.expression!)) {
-      expect(result.expression!.operator).toBe(BinaryOperator.And);
+      expect(result.expression.operator).toBe(BinaryOperator.And);
     }
   });
 
@@ -78,7 +78,7 @@ describe("parseExpression — explicit syntax", () => {
     const result = parseExpression("+ABC01 or -XYZ02");
     expect(result.diagnostics).toHaveLength(0);
     if (isBinaryExpr(result.expression!)) {
-      expect(result.expression!.operator).toBe(BinaryOperator.Or);
+      expect(result.expression.operator).toBe(BinaryOperator.Or);
     }
   });
 
@@ -87,10 +87,10 @@ describe("parseExpression — explicit syntax", () => {
     expect(result.diagnostics).toHaveLength(0);
     // Should parse as: +ABC01 or (-XYZ02 and +DEF03)
     if (isBinaryExpr(result.expression!)) {
-      expect(result.expression!.operator).toBe(BinaryOperator.Or);
-      expect(isBinaryExpr(result.expression!.right)).toBe(true);
-      if (isBinaryExpr(result.expression!.right)) {
-        expect(result.expression!.right.operator).toBe(BinaryOperator.And);
+      expect(result.expression.operator).toBe(BinaryOperator.Or);
+      expect(isBinaryExpr(result.expression.right)).toBe(true);
+      if (isBinaryExpr(result.expression.right)) {
+        expect(result.expression.right.operator).toBe(BinaryOperator.And);
       }
     }
   });
@@ -100,7 +100,7 @@ describe("parseExpression — explicit syntax", () => {
     expect(result.diagnostics).toHaveLength(0);
     expect(result.expression).not.toBeNull();
     if (isBinaryExpr(result.expression!)) {
-      expect(result.expression!.operator).toBe(BinaryOperator.Or);
+      expect(result.expression.operator).toBe(BinaryOperator.Or);
     }
   });
 

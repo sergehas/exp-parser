@@ -26,7 +26,14 @@ const DEFAULT_LIMITS: Required<RewriteLimits> = {
   maxRewrites: 2000,
 };
 
-/** Expands a boolean expression toward DNF or CNF using distribution rules. */
+/**
+ * Expands a boolean expression toward DNF or CNF using distribution rules.
+ *
+ * @param expression Expression to transform.
+ * @param form Target normal form.
+ * @param limits Optional rewrite limits overriding defaults.
+ * @returns Expanded expression and rewrite statistics.
+ */
 export function expandExpression(
   expression: BoolExpr,
   form: NormalForm,
@@ -52,7 +59,13 @@ export function expandExpression(
   };
 }
 
-/** Factorizes by extracting common terms on OR-of-AND or AND-of-OR shapes. */
+/**
+ * Factorizes an expression by extracting common factors.
+ *
+ * @param expression Expression to factorize.
+ * @param limits Optional rewrite limits overriding defaults.
+ * @returns Factorized expression and rewrite statistics.
+ */
 export function factorizeExpression(
   expression: BoolExpr,
   limits: RewriteLimits = DEFAULT_LIMITS
@@ -76,6 +89,15 @@ export function factorizeExpression(
 // Expand internals
 // ---------------------------------------------------------------------------
 
+/**
+ * Recursively expands an expression toward a target normal form.
+ *
+ * @param expression Current expression node.
+ * @param form Target normal form.
+ * @param limits Enforced transformation limits.
+ * @param stats Mutable rewrite counters.
+ * @returns Expanded expression subtree.
+ */
 function expandRecursive(
   expression: BoolExpr,
   form: NormalForm,
@@ -198,6 +220,14 @@ function expandRecursive(
 // Factorize internals
 // ---------------------------------------------------------------------------
 
+/**
+ * Recursively factorizes an expression by pulling out common factors.
+ *
+ * @param expression Current expression node.
+ * @param limits Enforced transformation limits.
+ * @param stats Mutable rewrite counters.
+ * @returns Factorized expression subtree.
+ */
 function factorizeRecursive(
   expression: BoolExpr,
   limits: Required<RewriteLimits>,
@@ -229,6 +259,14 @@ function factorizeRecursive(
   return current;
 }
 
+/**
+ * Attempts one factorization step across outer-operator terms.
+ *
+ * @param expression Expression candidate for factorization.
+ * @param innerOperator Operator inside each factorizable term.
+ * @param outerOperator Operator connecting top-level terms.
+ * @returns Factorized expression when a common factor exists; otherwise null.
+ */
 function factorizeOuter(
   expression: BoolExpr,
   innerOperator: BinaryOperator,
@@ -281,7 +319,7 @@ function factorizeOuter(
     if (remaining.length === 0) {
       grouped.push(best.expr);
     } else if (remaining.length === 1) {
-      grouped.push(remaining[0] as BoolExpr);
+      grouped.push(remaining[0]);
     } else {
       grouped.push(buildChain(remaining, innerOperator));
     }
@@ -311,6 +349,13 @@ function factorizeOuter(
 // Helpers
 // ---------------------------------------------------------------------------
 
+/**
+ * Builds a left-associative chain with a shared operator.
+ *
+ * @param terms Terms to chain.
+ * @param operator Operator connecting terms.
+ * @returns Chained expression.
+ */
 function buildChain(terms: readonly BoolExpr[], operator: BinaryOperator): BoolExpr {
   const [first, ...rest] = terms;
   if (first === undefined) {
@@ -329,6 +374,13 @@ function buildChain(terms: readonly BoolExpr[], operator: BinaryOperator): BoolE
   );
 }
 
+/**
+ * Merges two source spans into their enclosing span.
+ *
+ * @param left Left span.
+ * @param right Right span.
+ * @returns Span covering both inputs.
+ */
 function mergeSpan(left: SourceSpan, right: SourceSpan): SourceSpan {
   return {
     start: Math.min(left.start, right.start),
@@ -336,6 +388,13 @@ function mergeSpan(left: SourceSpan, right: SourceSpan): SourceSpan {
   };
 }
 
+/**
+ * Asserts depth, node-count, and rewrite limits.
+ *
+ * @param expression Expression to validate.
+ * @param limits Enforced transformation limits.
+ * @param stats Mutable rewrite counters.
+ */
 function assertLimits(
   expression: BoolExpr,
   limits: Required<RewriteLimits>,
@@ -356,6 +415,12 @@ function assertLimits(
   assertRewriteLimit(limits, stats);
 }
 
+/**
+ * Asserts rewrite count does not exceed configured maximum.
+ *
+ * @param limits Enforced transformation limits.
+ * @param stats Mutable rewrite counters.
+ */
 function assertRewriteLimit(limits: Required<RewriteLimits>, stats: MutableRewriteStats): void {
   if (stats.rewrites > limits.maxRewrites) {
     throw new Error(`Transformation exceeded maxRewrites (${limits.maxRewrites}).`);

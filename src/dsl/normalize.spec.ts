@@ -43,7 +43,7 @@ describe("expressionKey", () => {
     const a = makeVar(VariableSign.Equals, "ABC", "01");
     const b = makeVar(VariableSign.NotEquals, "XYZ", "02");
     const key = expressionKey(makeBin(BinaryOperator.And, a, b));
-    expect(key).toBe("AND(VAR:+:ABC:01,VAR:-:XYZ:02)");
+    expect(key).toBe("AND(VAR:-:XYZ:02,VAR:+:ABC:01)");
   });
 
   it("should sort terms in key for commutative comparison", () => {

@@ -65,7 +65,7 @@ describe("tokenize — explicit mode", () => {
   it("should emit diagnostics for unexpected characters", () => {
     const result = tokenize("+ABC01 @ +XYZ02", SyntaxMode.Explicit);
     expect(result.diagnostics).toHaveLength(1);
-    expect(result.diagnostics[0]!.message).toContain("@");
+    expect(result.diagnostics[0].message).toContain("@");
   });
 
   it("should handle a 1-char value (5 char total variable)", () => {
@@ -109,7 +109,7 @@ describe("tokenize — condensed mode", () => {
     ]);
   });
 
-  it("should handle \\r\\n line endings", () => {
+  it("should handle CRLF line endings", () => {
     const result = tokenize("+ABC01\r\n-XYZ02", SyntaxMode.Condensed);
     expect(result.diagnostics).toHaveLength(0);
     const types = result.tokens.map((t) => t.type);
@@ -158,7 +158,7 @@ describe("tokenize — condensed mode", () => {
   it("should emit diagnostics for unexpected characters", () => {
     const result = tokenize("+ABC01 $ +XYZ02", SyntaxMode.Condensed);
     expect(result.diagnostics).toHaveLength(1);
-    expect(result.diagnostics[0]!.message).toContain("$");
+    expect(result.diagnostics[0].message).toContain("$");
   });
 
   it("should handle multiple lines with multiple variables", () => {

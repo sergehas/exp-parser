@@ -4,6 +4,7 @@
   "description": "boolean expression parser",
   "main": "./dist/main.js",
   "scripts": {
+    "start": "npx ts-node ./src/main.ts",
     "test": "jest",
     "test:coverage": "jest --coverage",
     "build": "tsc",
@@ -43,6 +44,7 @@
     "@types/node": "^24.1.0",
     "eslint": "^10.0.0",
     "eslint-config-prettier": "^10.1.1",
+    "globals": "^17.0.0",
     "husky": "^9.1.0",
     "jest": "^30.0.5",
     "lint-staged": "^16.1.2",

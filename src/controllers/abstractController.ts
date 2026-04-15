@@ -1,5 +1,6 @@
 import { setLogLevel } from "../services/utils/logger";
 
+/** Context required for controller request handling, including verbosity level. */
 export interface AbstractControllerContext {
   verbose: number;
 }

@@ -1,6 +1,11 @@
 import { BinaryOperator, BoolExpr, ExprKind, SourceSpan, isBinaryExpr } from "./types";
 
-/** Produces a canonical, sorted, deduplicated form of a boolean expression. */
+/**
+ * Produces a canonical, sorted, and deduplicated form of a boolean expression.
+ *
+ * @param expression Expression tree to normalize.
+ * @returns Canonicalized expression with flattened and stable term ordering.
+ */
 export function canonicalizeExpression(expression: BoolExpr): BoolExpr {
   if (!isBinaryExpr(expression)) {
     return expression;
@@ -23,24 +28,37 @@ export function canonicalizeExpression(expression: BoolExpr): BoolExpr {
   const absorbedTerms = applyAbsorption(dedupedTerms, operator);
 
   if (absorbedTerms.length === 1) {
-    return absorbedTerms[0] as BoolExpr;
+    return absorbedTerms[0];
   }
 
   return buildChain(absorbedTerms, operator, expression.span);
 }
 
-/** Builds a canonical string key for an expression (used for dedup and sorting). */
+/**
+ * Builds a canonical string key for an expression.
+ *
+ * @param expression Expression to encode.
+ * @returns Stable key used for deduplication and ordering.
+ */
 export function expressionKey(expression: BoolExpr): string {
   if (!isBinaryExpr(expression)) {
     return `VAR:${expression.sign}:${expression.code}:${expression.value}`;
   }
 
   const op = expression.operator;
-  const terms = extractTerms(expression, op).map(expressionKey).sort();
+  const terms = extractTerms(expression, op)
+    .map(expressionKey)
+    .sort((a, b) => a.localeCompare(b, "en-US"));
   return `${op}(${terms.join(",")})`;
 }
 
-/** Flattens a chain of the same binary operator into an array of terms. */
+/**
+ * Flattens a chain of matching binary operators into a term array.
+ *
+ * @param expression Expression to flatten.
+ * @param operator Operator to flatten by.
+ * @returns Flat list of terms.
+ */
 export function extractTerms(expression: BoolExpr, operator: BinaryOperator): BoolExpr[] {
   if (!isBinaryExpr(expression) || expression.operator !== operator) {
     return [expression];
@@ -49,6 +67,13 @@ export function extractTerms(expression: BoolExpr, operator: BinaryOperator): Bo
   return [...extractTerms(expression.left, operator), ...extractTerms(expression.right, operator)];
 }
 
+/**
+ * Applies absorption law to remove redundant terms.
+ *
+ * @param terms Candidate terms for simplification.
+ * @param outerOperator Operator linking top-level terms.
+ * @returns Terms after absorption is applied.
+ */
 function applyAbsorption(terms: readonly BoolExpr[], outerOperator: BinaryOperator): BoolExpr[] {
   const innerOperator =
     outerOperator === BinaryOperator.And ? BinaryOperator.Or : BinaryOperator.And;
@@ -78,7 +103,14 @@ function applyAbsorption(terms: readonly BoolExpr[], outerOperator: BinaryOperat
   return result;
 }
 
-/** Builds a left-associative chain from an array of terms with the given operator. */
+/**
+ * Builds a left-associative binary chain from terms.
+ *
+ * @param terms Terms to chain.
+ * @param operator Operator placed between chained terms.
+ * @param span Source span to assign to generated binary nodes.
+ * @returns Composed expression tree.
+ */
 export function buildChain(
   terms: readonly BoolExpr[],
   operator: BinaryOperator,
@@ -101,7 +133,12 @@ export function buildChain(
   );
 }
 
-/** Counts the total number of nodes (variables + operators) in an expression. */
+/**
+ * Counts total AST nodes in an expression.
+ *
+ * @param expression Expression to measure.
+ * @returns Number of variable and binary nodes.
+ */
 export function nodeCount(expression: BoolExpr): number {
   if (!isBinaryExpr(expression)) {
     return 1;
@@ -109,7 +146,12 @@ export function nodeCount(expression: BoolExpr): number {
   return 1 + nodeCount(expression.left) + nodeCount(expression.right);
 }
 
-/** Returns the maximum depth of the expression tree. */
+/**
+ * Computes maximum depth of an expression tree.
+ *
+ * @param expression Expression to measure.
+ * @returns Maximum depth, where leaf variables have depth 1.
+ */
 export function maxDepth(expression: BoolExpr): number {
   if (!isBinaryExpr(expression)) {
     return 1;

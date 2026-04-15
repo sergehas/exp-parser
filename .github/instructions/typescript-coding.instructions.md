@@ -14,15 +14,22 @@ Apply the [general coding guidelines](./general-coding.instructions.md) to all c
 - Use type guards for type narrowing
 - Avoid using `any` type; prefer specific types or `unknown` if type is not known.
 - Use `as const` for literal types when appropriate
-- Use JSDoc comments for complex functions and classes
+- Use JSDoc comments for complex functions and classes. Document parameters, return types, and any important details about behavior.
 - Use interfaces for data structures and type definitions
 - Prefer immutable data (`const`, `readonly`).
 - Use optional chaining (`?.`) and nullish coalescing (`??`).
+- Avoid using `var`; use `let` and `const` instead
+- Use `async/await` for asynchronous code; avoid callbacks and `.then()`
+- Use `try/catch` for error handling in async functions
+- Use `Promise.all` for concurrent async operations
+- avoid unnecessary type assertions; let TypeScript infer types when possible
+- avoid unnecessary '!' assertions
 
 ## tests
 
 - Write unit tests using Jest testing framework.
 - Test coverage should be at least 80% for all branches.
+- Use descriptive test names that explain the expected behavior.
 
 ### Test Structure
 
