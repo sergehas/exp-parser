@@ -1,0 +1,70 @@
+{
+  "name": "exp-parser",
+  "version": "0.0.1-SNAPSHOT.0",
+  "description": "boolean expression parser",
+  "main": "./dist/main.js",
+  "scripts": {
+    "test": "jest",
+    "test:coverage": "jest --coverage",
+    "build": "tsc",
+    "pretty": "npx prettier **/* --write --ignore-unknown",
+    "clean": "rimraf dist coverage",
+    "clean:deps": "rimraf node_modules dist coverage",
+    "preversion": "git config  user.email \"noreply@deploy.com\" && git config user.name \"buildprocess\"",
+    "release:patch": "mkdir -p ./.git && npm -force version patch -m \"Releasing patch version %s \"",
+    "release:minor": "mkdir -p ./.git && npm -force version minor -m \"Releasing minor version %s \"",
+    "release:major": "mkdir -p ./.git && npm -force version major -m \"Releasing major version %s \"",
+    "increment": "git config  user.email \"noreply@deploy.com\" && git config user.name \"buildprocess\" && npm --no-git-tag-version -force version prerelease --preid=SNAPSHOT && git add package.json package-lock.json && git commit -m \"Preparing next snapshot\"  && git push",
+    "echoversion": "printf \"##teamcity[setParameter name='env.PROJECT_VERSION' value='%s']\" ${npm_package_version} ",
+    "postrelease": "git config  user.email \"noreply@mpsa.com\" && git config user.name \"buildprocess\" && git push && git push --tags",
+    "lint": "npx eslint . --ext js,ts,json --quiet && npx prettier **/* --write --ignore-unknown",
+    "lint:fix": "npx eslint . --ext js,ts,json --fix",
+    "lint:only": "npx eslint . --ext js,ts,json --quiet",
+    "prepare": "husky"
+  },
+  "keywords": [
+    "SonarQube",
+    "Github",
+    "reports"
+  ],
+  "author": "",
+  "license": "Proprietary",
+  "dependencies": {
+    "winston": "^3.10.0",
+    "yargs": "^17.7.2"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.22.0",
+    "@eslint/json": "^0.13.0",
+    "@types/fs-extra": "^11.0.1",
+    "@types/jest": "^30.0.0",
+    "@types/js-yaml": "^4.0.9",
+    "@types/yargs": "^17.0.24",
+    "@types/node": "^24.1.0",
+    "eslint": "^10.0.0",
+    "eslint-config-prettier": "^10.1.1",
+    "husky": "^9.1.0",
+    "jest": "^30.0.5",
+    "lint-staged": "^16.1.2",
+    "nodemon": "^3.1.10",
+    "prettier": "~3.8.0",
+    "rimraf": "^6.0.0",
+    "ts-jest": "^29.4.0",
+    "ts-node": "^10.9.1",
+    "typescript": "~5.9.0",
+    "typescript-eslint": "^8.56.0"
+  },
+  "lint-staged": {
+    "*.{js,ts,json}": [
+      "eslint --quiet --fix",
+      "prettier --write --ignore-unknown"
+    ]
+  },
+  "prettier": {
+    "trailingComma": "es5",
+    "tabWidth": 2,
+    "semi": true,
+    "singleQuote": false,
+    "quoteProps": "consistent"
+  }
+}

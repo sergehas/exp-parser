@@ -1,0 +1,31 @@
+# <type>[optional scope]: <description>
+#
+# TYPES: feat, fix, docs, style, refactor, perf, test, chore, ci, build
+#
+# Examples:
+#   feat(core): add authentication service
+#   fix(shared): correct icon selector styling
+#   docs(readme): add setup instructions
+#   style(theme): adjust color palette
+#   refactor(demo): simplify component logic
+#   perf(table): optimize rendering performance
+#   test(list-of-values): add unit tests for grouping
+#   chore(deps): update Angular to v21
+#   ci(workflows): add GitHub Actions for e2e tests
+#   build(build): update bundler configuration
+#
+# Scopes (optional): core, shared, demo, art-institute, list-of-values, nav
+#
+# <SUBJECT>
+# - Use imperative mood ("add feature" not "added feature")
+# - Don't capitalize first letter
+# - No period at the end
+# - Maximum 100 characters
+#
+# <BODY (optional)>
+# Explain what and why, not how (how is in code).
+# Wrap at 100 characters.
+#
+# <FOOTER (optional)>
+# Mention breaking changes:
+# BREAKING CHANGE: <description>

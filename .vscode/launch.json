@@ -1,0 +1,146 @@
+{
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Generate SQ reports",
+      "skipFiles": ["<node_internals>/**"],
+      "runtimeArgs": ["--no-warnings"],
+      "program": "${workspaceFolder}\\src\\main.ts",
+      "args": [
+        "sq",
+        "-r",
+        "json",
+        "mds",
+        "csv",
+        "xlsx",
+        "-p",
+        "DevEntity-HRTD-DDCE-EXT-HERMES-Cell-DVCCAPMVP",
+        "com.inetpsa.oms00:gui",
+        "com.inetpsa.sc400:gui",
+        "-vvvv"
+        // "-c",
+        // "reports/report-2024-12-05T13_04_29.696Z.json"
+      ],
+      "env": {
+        "MDR_SQ_TOKEN": "${input:sq_token}",
+        "NODE_OPTIONS": "--no-warnings"
+      },
+      "preLaunchTask": "tsc: build - tsconfig.json",
+      "outFiles": ["${workspaceFolder}/build/**/*.js"],
+      //"console": "internalConsole",
+      "outputCapture": "std"
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Test SQ reports",
+      "skipFiles": ["<node_internals>/**"],
+      "runtimeArgs": ["--no-warnings"],
+      "program": "${workspaceFolder}\\src\\main.ts",
+      "args": [
+        "sq",
+        "-r",
+        "json",
+        "mds",
+        "csv",
+        "xlsx",
+        "-p",
+        "com.inetpsa.oms00:gui",
+        "com.inetpsa.sc400:gui",
+        "-vvvv",
+        // "-c",
+        // "reports/report-2024-10-17T12_03_11.778Z.json",
+        "-f",
+        "reports-test"
+      ],
+      "env": {
+        "MDR_SQ_TOKEN": "${input:sq_token}",
+        "NODE_OPTIONS": "--no-warnings"
+      },
+      "preLaunchTask": "tsc: build - tsconfig.json",
+      "outFiles": ["${workspaceFolder}/build/**/*.js"],
+      //"console": "internalConsole",
+      "outputCapture": "std"
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Test GH activity reports",
+      "skipFiles": ["<node_internals>/**"],
+      "runtimeArgs": ["--no-warnings"],
+      "program": "${workspaceFolder}\\src\\main.ts",
+      "args": ["gh", "a", "-r", "json", "csv", "-o", "gcs00", "-vvvvv", "-f", "reports-test"],
+      "env": {
+        "MDR_GH_TOKEN": "${input:gh_token}",
+        "NODE_OPTIONS": "--no-warnings",
+        "NODE_TLS_REJECT_UNAUTHORIZED": "0"
+      },
+      "preLaunchTask": "tsc: build - tsconfig.json",
+      "outFiles": ["${workspaceFolder}/build/**/*.js"],
+      //"console": "internalConsole",
+      "outputCapture": "std"
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Test GH branch reports",
+      "skipFiles": ["<node_internals>/**"],
+      "runtimeArgs": ["--no-warnings"],
+      "program": "${workspaceFolder}\\src\\main.ts",
+      "args": [
+        "gh",
+        "b",
+        "-r",
+        "json",
+        "csv",
+        "xlsx",
+        "-o",
+        "cay00",
+        "cmp00",
+        "cso00",
+        "dql00",
+        "ex100",
+        "gcb00",
+        "gcs00",
+        "kor21",
+        "lll00",
+        "oms00",
+        "s4l00",
+        "sc400",
+        "vic00",
+        "-vvvvv",
+        "-f",
+        "reports-test"
+      ],
+      "env": {
+        "MDR_GH_TOKEN": "${input:gh_token}",
+        "NODE_OPTIONS": "--no-warnings",
+        "NODE_TLS_REJECT_UNAUTHORIZED": "0"
+      },
+      "preLaunchTask": "tsc: build - tsconfig.json",
+      "outFiles": ["${workspaceFolder}/build/**/*.js"],
+      //"console": "internalConsole",
+      "outputCapture": "std"
+    }
+  ],
+  "inputs": [
+    /** skipping componentType definition for brevity -- see docs for that */
+    {
+      "type": "promptString",
+      "id": "sq_token",
+      "description": "Sonarqube token",
+      "password": true
+    },
+    {
+      "type": "promptString",
+      "id": "gh_token",
+      "description": "GH token",
+      "password": true
+    }
+  ]
+}
