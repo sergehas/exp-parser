@@ -48,6 +48,21 @@ describe("expandExpression", () => {
     }
   });
 
+  it("should expand DNF when OR is on the right side", () => {
+    // A and (B or C) → (A and B) or (A and C)
+    const a = makeVar(VariableSign.Equals, "AAA", "01");
+    const b = makeVar(VariableSign.Equals, "BBB", "01");
+    const c = makeVar(VariableSign.Equals, "CCC", "01");
+    const expr = makeBin(BinaryOperator.And, a, makeBin(BinaryOperator.Or, b, c));
+
+    const result = expandExpression(expr, NormalForm.Dnf);
+    expect(result.stats.rewrites).toBeGreaterThan(0);
+    expect(isBinaryExpr(result.expression)).toBe(true);
+    if (isBinaryExpr(result.expression)) {
+      expect(result.expression.operator).toBe(BinaryOperator.Or);
+    }
+  });
+
   it("should expand OR-over-AND to CNF", () => {
     // (A and B) or C → (A or C) and (B or C)
     const a = makeVar(VariableSign.Equals, "AAA", "01");
@@ -64,12 +79,37 @@ describe("expandExpression", () => {
     }
   });
 
+  it("should expand CNF when AND is on the right side", () => {
+    // A or (B and C) → (A or B) and (A or C)
+    const a = makeVar(VariableSign.Equals, "AAA", "01");
+    const b = makeVar(VariableSign.Equals, "BBB", "01");
+    const c = makeVar(VariableSign.Equals, "CCC", "01");
+    const expr = makeBin(BinaryOperator.Or, a, makeBin(BinaryOperator.And, b, c));
+
+    const result = expandExpression(expr, NormalForm.Cnf);
+    expect(result.stats.rewrites).toBeGreaterThan(0);
+    expect(isBinaryExpr(result.expression)).toBe(true);
+    if (isBinaryExpr(result.expression)) {
+      expect(result.expression.operator).toBe(BinaryOperator.And);
+    }
+  });
+
   it("should leave already-DNF expression unchanged", () => {
     const a = makeVar(VariableSign.Equals, "AAA", "01");
     const b = makeVar(VariableSign.Equals, "BBB", "01");
     const expr = makeBin(BinaryOperator.Or, a, b);
     const result = expandExpression(expr, NormalForm.Dnf);
     expect(result.stats.rewrites).toBe(0);
+  });
+
+  it("should not rewrite CNF when OR has no distributable AND side", () => {
+    const a = makeVar(VariableSign.Equals, "AAA", "01");
+    const b = makeVar(VariableSign.Equals, "BBB", "01");
+    const expr = makeBin(BinaryOperator.Or, a, b);
+
+    const result = expandExpression(expr, NormalForm.Cnf);
+    expect(result.stats.rewrites).toBe(0);
+    expect(result.expression).toEqual(expr);
   });
 
   it("should throw on exceeding maxNodes", () => {
@@ -128,6 +168,26 @@ describe("factorizeExpression", () => {
     expect(result.stats.rewrites).toBe(0);
   });
 
+  it("should stop early when canonicalization collapses a binary expression", () => {
+    const a = makeVar(VariableSign.Equals, "AAA", "01");
+    const duplicated = makeBin(BinaryOperator.And, a, a);
+
+    const result = factorizeExpression(duplicated);
+
+    expect(result.stats.rewrites).toBe(0);
+    expect(result.expression.kind).toBe(ExprKind.Variable);
+  });
+
+  it("should collapse duplicate OR branches before factorization", () => {
+    const parsed = parseExpression("+AAA01 or +AAA01");
+    expect(parsed.expression).not.toBeNull();
+
+    const result = factorizeExpression(parsed.expression!);
+
+    expect(result.stats.rewrites).toBe(0);
+    expect(result.expression.kind).toBe(ExprKind.Variable);
+  });
+
   it("should throw on exceeding maxRewrites", () => {
     const a = makeVar(VariableSign.Equals, "AAA", "01");
     const b = makeVar(VariableSign.Equals, "BBB", "01");
@@ -175,5 +235,31 @@ describe("domain-aware factorization", () => {
     const factorized = factorizeExpression(parsed.expression!);
     const factorizedStr = stringifyExpression(factorized.expression, SyntaxMode.Explicit);
     expect(factorizedStr.length).toBeGreaterThan(0);
+  });
+
+  it("should factorize while preserving non-matching terms", () => {
+    const parsed = parseExpression(
+      "+AAA01 or (+AAA01 and +BBB01) or (+AAA01 and +CCC01) or (+DDD01 and +EEE01)"
+    );
+    expect(parsed.expression).not.toBeNull();
+
+    const result = factorizeExpression(parsed.expression!);
+    const str = stringifyExpression(result.expression, SyntaxMode.Explicit);
+
+    expect(str).toContain("+DDD01 and +EEE01");
+    expect(str).toContain("+AAA01");
+  });
+
+  it("should handle tie-breaking between equally frequent factors", () => {
+    const parsed = parseExpression(
+      "(+AAA01 and +XXX01) or (+AAA01 and +YYY01) or (+BBB01 and +XXX01) or (+BBB01 and +YYY01)"
+    );
+    expect(parsed.expression).not.toBeNull();
+
+    const result = factorizeExpression(parsed.expression!);
+    const str = stringifyExpression(result.expression, SyntaxMode.Explicit);
+
+    expect(result.stats.rewrites).toBeGreaterThan(0);
+    expect(str.length).toBeGreaterThan(0);
   });
 });

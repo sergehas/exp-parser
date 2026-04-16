@@ -1,6 +1,13 @@
 import { SyntaxMode } from "./detect";
 import { parseExpression, stringifyExpression } from "./parser";
-import { BinaryOperator, ExprKind, VariableSign, isBinaryExpr, isVariableExpr } from "./types";
+import {
+  BinaryOperator,
+  BoolExpr,
+  ExprKind,
+  VariableSign,
+  isBinaryExpr,
+  isVariableExpr,
+} from "./types";
 
 describe("parseExpression — condensed syntax", () => {
   it("should parse a single variable", () => {
@@ -72,6 +79,26 @@ describe("parseExpression — explicit syntax", () => {
     if (isBinaryExpr(result.expression!)) {
       expect(result.expression.operator).toBe(BinaryOperator.And);
     }
+  });
+
+  it("should return lexer diagnostics without parsing when tokenization fails", () => {
+    const result = parseExpression("+ABC01 and @");
+    expect(result.expression).toBeNull();
+    expect(result.diagnostics.length).toBeGreaterThan(0);
+  });
+
+  it("should report unexpected trailing token", () => {
+    const result = parseExpression("+ABC01 and -XYZ02 +DEF03");
+    expect(result.expression).toBeNull();
+    expect(
+      result.diagnostics.some((diag) => diag.message.includes("Unexpected trailing token"))
+    ).toBe(true);
+  });
+
+  it("should report parse error when operator has missing right-hand side", () => {
+    const result = parseExpression("+ABC01 and )");
+    expect(result.expression).toBeNull();
+    expect(result.diagnostics.length).toBeGreaterThan(0);
   });
 
   it("should parse simple OR expression", () => {
@@ -166,6 +193,44 @@ describe("stringifyExpression — condensed mode", () => {
     const result = parseExpression("+ABC01");
     const str = stringifyExpression(result.expression!, SyntaxMode.Condensed);
     expect(str).toBe("+ABC01");
+  });
+
+  it("should use explicit fallback when an AND term still contains OR", () => {
+    const expression: BoolExpr = {
+      kind: ExprKind.Binary,
+      operator: BinaryOperator.And,
+      left: {
+        kind: ExprKind.Binary,
+        operator: BinaryOperator.Or,
+        left: {
+          kind: ExprKind.Variable,
+          sign: VariableSign.Equals,
+          code: "ABC",
+          value: "01",
+          span: { start: 0, end: 0 },
+        },
+        right: {
+          kind: ExprKind.Variable,
+          sign: VariableSign.NotEquals,
+          code: "XYZ",
+          value: "02",
+          span: { start: 0, end: 0 },
+        },
+        span: { start: 0, end: 0 },
+      },
+      right: {
+        kind: ExprKind.Variable,
+        sign: VariableSign.Equals,
+        code: "DEF",
+        value: "03",
+        span: { start: 0, end: 0 },
+      },
+      span: { start: 0, end: 0 },
+    };
+
+    const str = stringifyExpression(expression, SyntaxMode.Condensed);
+    expect(str).toContain("(+ABC01 or -XYZ02)");
+    expect(str).toContain("+DEF03");
   });
 
   it("should stringify AND as space-separated", () => {

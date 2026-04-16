@@ -2,23 +2,84 @@
 
 > Requirements: **Node >= 22**
 
-## What this DSL does
+## What this it does
+
+### DSL
 
 DSL stands for Domain-Specific Language.
 
 This DSL is used to express business logic as boolean rules, such as inclusion/exclusion criteria, in either compact or explicit wording.
 
-The parser helps teams:
+The parser:
 
 - accept rules in two equivalent input styles (condensed and explicit)
 - confirm a consistent interpretation of the rule
 - view the rule in normalized business-readable forms for validation and discussion
 
-Acronyms used in outputs:
+### Expression syntax
 
-- CLI: Command-Line Interface
-- DNF: Disjunctive Normal Form
-- CNF: Conjunctive Normal Form
+It parse expressions representing conditions which can be organized with `AND` and `OR`, written in a custom simple language. Then, when parsed, I want to be able to expand of factorize them
+hint: using a DSL, parser/lexer/normalize/transform , building an AST, may be a good option
+
+example expression to parse (condensed syntax)
+
+```text
+-ABC01 -AXC02 +XYZB1 +AAA01 +AAA02-ADEXX +ABC02
+```
+
+which means:
+
+```python
+(not(ABC="01") and not(AXC="02") and XYZ="B1" and AAA="02") or (not(ADE="XX") and  ABC="02")
+```
+
+Same expression, but explicit syntax :
+
+```text
+(-ABC01 and -AXBC02 and +XYZB1 and +AAA01 and +AAA02) or (-ADEXX and +ABC02)
+```
+
+in both syntaxes:
+
+- `-` means `not equals`
+- `+` means `equals`
+
+in condensed syntax :
+
+- `' '` means `and`
+- `\r` means `or`
+- each line is implicitly a group as if it was surrounded with parenthesis
+
+in explicit syntax
+
+- and `and` and `or` operator are mandatory
+- parenthesis are explicit
+- the meaning of `-` and `+` are the same as in condensed syntax
+- grouping is done with explicit parenthesis
+- `' '` is a separator
+- `\n` is also a separator and has no meaning specific meaning
+
+the 2 syntaxes cannot be mixed
+
+### Acronyms used in outputs
+
+- `CLI`: Command-Line Interface
+- `DNF`: Disjunctive Normal Form
+- `CNF`: Conjunctive Normal Form
+
+#### Examples
+
+- `+ABC01 and -XYZ02`
+- `(+ABC01 or -XYZ02) and +DEF03`
+- multi line
+
+    ```text
+    +ABC01 -XYZ02
+    +DEF03 +GHI04
+    +ABC01 -XYZ03
+    +ABC01 -XYZ04
+    +DEF03 +GHI08 +BOE00 -B0K22 +BOJ44
+    ```
 
 ## Install
 
@@ -53,7 +114,7 @@ Multi-line (OR of AND groups):
 npx ts-node .\src\main.ts parse -vvvv -e "+ABC01 -XYZ02\n+ABC01 +GHI04\n+DEF03 +GHI04"
 ```
 
-> "\n" are literals in the expression. They are substituted by '\n' char before processing
+> "\n" are literals in the expression. They are substituted by `\n` char before processing
 
 #### Explicit syntax
 
