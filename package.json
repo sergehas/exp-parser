@@ -17,7 +17,7 @@
     "release:major": "mkdir -p ./.git && npm -force version major -m \"Releasing major version %s \"",
     "increment": "git config  user.email \"noreply@deploy.com\" && git config user.name \"buildprocess\" && npm --no-git-tag-version -force version prerelease --preid=SNAPSHOT && git add package.json package-lock.json && git commit -m \"Preparing next snapshot\"  && git push",
     "echoversion": "printf \"##teamcity[setParameter name='env.PROJECT_VERSION' value='%s']\" ${npm_package_version} ",
-    "postrelease": "git config  user.email \"noreply@mpsa.com\" && git config user.name \"buildprocess\" && git push && git push --tags",
+    "postrelease": "git config  user.email \"noreply@deploy.com\" && git config user.name \"buildprocess\" && git push && git push --tags",
     "lint": "npx eslint . --ext js,ts,json --quiet && npx prettier **/* --write --ignore-unknown",
     "lint:fix": "npx eslint . --ext js,ts,json --fix",
     "lint:only": "npx eslint . --ext js,ts,json --quiet",
