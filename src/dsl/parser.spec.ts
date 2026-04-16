@@ -1,5 +1,9 @@
+import * as detect from "./detect";
 import { SyntaxMode } from "./detect";
+import * as lexer from "./lexer";
 import { parseExpression, stringifyExpression } from "./parser";
+
+import { TokenType } from "./lexer";
 import {
   BinaryOperator,
   BoolExpr,
@@ -272,4 +276,50 @@ describe("roundtrip: parse → stringify → parse", () => {
       expect(str2).toBe(str);
     });
   }
+});
+//---------------------------------
+describe("parseExpression internals with mocked lexer", () => {
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("should default missing variable token fields during explicit parse", async () => {
+    jest.spyOn(detect, "detectSyntax").mockReturnValue(SyntaxMode.Explicit);
+    jest.spyOn(lexer, "tokenize").mockImplementation(() => ({
+      tokens: [
+        {
+          type: TokenType.Variable,
+          start: 0,
+          end: 1,
+        },
+        {
+          type: TokenType.Eof,
+          start: 1,
+          end: 1,
+        },
+      ],
+      diagnostics: [],
+    }));
+
+    const result = parseExpression("ignored");
+
+    expect(result.diagnostics).toHaveLength(0);
+    expect(result.expression).not.toBeNull();
+    expect(result.expression).toMatchObject({
+      kind: ExprKind.Variable,
+      sign: VariableSign.Equals,
+      code: "",
+      value: "",
+    });
+  });
+
+  it("should throw when lexer returns an empty token stream", async () => {
+    jest.spyOn(detect, "detectSyntax").mockReturnValue(SyntaxMode.Explicit);
+    jest.spyOn(lexer, "tokenize").mockImplementation(() => ({
+      tokens: [],
+      diagnostics: [],
+    }));
+
+    expect(() => parseExpression("ignored")).toThrow();
+  });
 });
