@@ -336,7 +336,7 @@ export function stringifyExpression(expression: BoolExpr, mode: SyntaxMode): str
 }
 
 /**
- * Formats a variable expression as sign+code+value text.
+ * Formats a variable expression as sign+code+value text for condensed output.
  *
  * @param sign Variable sign marker.
  * @param code Variable code segment.
@@ -348,6 +348,19 @@ function variableToString(sign: VariableSign, code: string, value: string): stri
 }
 
 /**
+ * Formats a variable expression as CODE:VALUE or CODE!VALUE text for explicit output.
+ *
+ * @param sign Variable sign marker.
+ * @param code Variable code segment.
+ * @param value Variable value segment.
+ * @returns Serialized explicit variable token text.
+ */
+function explicitVariableToString(sign: VariableSign, code: string, value: string): string {
+  const separator = sign === VariableSign.Equals ? ":" : "!";
+  return `${code.toUpperCase()}${separator}${value.toUpperCase()}`;
+}
+
+/**
  * Stringifies an expression in explicit infix notation.
  *
  * @param expression Expression subtree to stringify.
@@ -356,7 +369,7 @@ function variableToString(sign: VariableSign, code: string, value: string): stri
  */
 function stringifyExplicit(expression: BoolExpr, parentPrecedence: number): string {
   if (!isBinaryExpr(expression)) {
-    return variableToString(expression.sign, expression.code, expression.value);
+    return explicitVariableToString(expression.sign, expression.code, expression.value);
   }
 
   const currentPrecedence = expression.operator === BinaryOperator.And ? 20 : 10;

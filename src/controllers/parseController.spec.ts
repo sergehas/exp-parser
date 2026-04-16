@@ -44,10 +44,10 @@ describe("ParseController", () => {
       diagnostics: [{ message: "Invalid token", span: { start: 2, end: 4 } }],
     });
 
-    const controller = new ParseController({ expression: "+ABC01 and", verbose: 1 });
+    const controller = new ParseController({ expression: "ABC:01 and", verbose: 1 });
     await controller.handleRequest();
 
-    expect(logger.info).toHaveBeenCalledWith("Input expression: +ABC01 and");
+    expect(logger.info).toHaveBeenCalledWith("Input expression: ABC:01 and");
     expect(logger.error).toHaveBeenCalledWith("Failed to parse expression:");
     expect(logger.error).toHaveBeenCalledWith("  [2-4] Invalid token");
     expect(expandExpression).not.toHaveBeenCalled();
@@ -82,14 +82,14 @@ describe("ParseController", () => {
       stats: { rewrites: 2, maxDepth: 3, nodeCount: 4 },
     });
 
-    const controller = new ParseController({ expression: "+ABC01 and -XYZ02", verbose: 2 });
+    const controller = new ParseController({ expression: "ABC:01 and XYZ!02", verbose: 2 });
     await controller.handleRequest();
 
-    expect(parseExpression).toHaveBeenCalledWith("+ABC01 and -XYZ02");
+    expect(parseExpression).toHaveBeenCalledWith("ABC:01 and XYZ!02");
     expect(expandExpression).toHaveBeenCalledWith(ast, NormalForm.Dnf);
     expect(factorizeExpression).toHaveBeenCalledWith(ast);
 
-    expect(logger.info).toHaveBeenCalledWith("Input expression: +ABC01 and -XYZ02");
+    expect(logger.info).toHaveBeenCalledWith("Input expression: ABC:01 and XYZ!02");
     expect(logger.info).toHaveBeenCalledWith("Explicit : explicit:Binary");
     expect(logger.info).toHaveBeenCalledWith("Condensed:\ncondensed:Binary");
     expect(logger.info).toHaveBeenCalledWith("Expanded (DNF) : explicit:Variable");

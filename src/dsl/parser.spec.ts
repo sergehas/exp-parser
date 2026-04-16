@@ -77,7 +77,7 @@ describe("parseExpression — condensed syntax", () => {
 
 describe("parseExpression — explicit syntax", () => {
   it("should parse simple AND expression", () => {
-    const result = parseExpression("+ABC01 and -XYZ02");
+    const result = parseExpression("ABC:01 and XYZ!02");
     expect(result.diagnostics).toHaveLength(0);
     expect(result.expression).not.toBeNull();
     if (isBinaryExpr(result.expression!)) {
@@ -86,13 +86,13 @@ describe("parseExpression — explicit syntax", () => {
   });
 
   it("should return lexer diagnostics without parsing when tokenization fails", () => {
-    const result = parseExpression("+ABC01 and @");
+    const result = parseExpression("ABC:01 and @");
     expect(result.expression).toBeNull();
     expect(result.diagnostics.length).toBeGreaterThan(0);
   });
 
   it("should report unexpected trailing token", () => {
-    const result = parseExpression("+ABC01 and -XYZ02 +DEF03");
+    const result = parseExpression("ABC:01 and XYZ!02 DEF:03");
     expect(result.expression).toBeNull();
     expect(
       result.diagnostics.some((diag) => diag.message.includes("Unexpected trailing token"))
@@ -100,13 +100,13 @@ describe("parseExpression — explicit syntax", () => {
   });
 
   it("should report parse error when operator has missing right-hand side", () => {
-    const result = parseExpression("+ABC01 and )");
+    const result = parseExpression("ABC:01 and )");
     expect(result.expression).toBeNull();
     expect(result.diagnostics.length).toBeGreaterThan(0);
   });
 
   it("should parse simple OR expression", () => {
-    const result = parseExpression("+ABC01 or -XYZ02");
+    const result = parseExpression("ABC:01 or XYZ!02");
     expect(result.diagnostics).toHaveLength(0);
     if (isBinaryExpr(result.expression!)) {
       expect(result.expression.operator).toBe(BinaryOperator.Or);
@@ -114,9 +114,9 @@ describe("parseExpression — explicit syntax", () => {
   });
 
   it("should respect AND > OR precedence", () => {
-    const result = parseExpression("+ABC01 or -XYZ02 and +DEF03");
+    const result = parseExpression("ABC:01 or XYZ!02 and DEF:03");
     expect(result.diagnostics).toHaveLength(0);
-    // Should parse as: +ABC01 or (-XYZ02 and +DEF03)
+    // Should parse as: ABC:01 or (XYZ!02 and DEF:03)
     if (isBinaryExpr(result.expression!)) {
       expect(result.expression.operator).toBe(BinaryOperator.Or);
       expect(isBinaryExpr(result.expression.right)).toBe(true);
@@ -127,7 +127,7 @@ describe("parseExpression — explicit syntax", () => {
   });
 
   it("should parse parenthesized groups", () => {
-    const result = parseExpression("(-ABC01 and -AXB02 and +XYZB1) or (-ADEXX and +ABC02)");
+    const result = parseExpression("(ABC!01 and AXB!02 and XYZ:B1) or (ADE!XX and ABC:02)");
     expect(result.diagnostics).toHaveLength(0);
     expect(result.expression).not.toBeNull();
     if (isBinaryExpr(result.expression!)) {
@@ -136,13 +136,13 @@ describe("parseExpression — explicit syntax", () => {
   });
 
   it("should handle nested parentheses", () => {
-    const result = parseExpression("(+ABC01 and (+XYZ02 or +DEF03))");
+    const result = parseExpression("(ABC:01 and (XYZ:02 or DEF:03))");
     expect(result.diagnostics).toHaveLength(0);
     expect(result.expression).not.toBeNull();
   });
 
   it("should report error for missing closing paren", () => {
-    const result = parseExpression("(+ABC01 and +XYZ02");
+    const result = parseExpression("(ABC:01 and XYZ:02");
     expect(result.expression).toBeNull();
     expect(result.diagnostics.length).toBeGreaterThan(0);
   });
@@ -154,7 +154,7 @@ describe("parseExpression — explicit syntax", () => {
   });
 
   it("should handle case-insensitive keywords", () => {
-    const result = parseExpression("+ABC01 AND -XYZ02 OR +DEF03");
+    const result = parseExpression("ABC:01 AND XYZ!02 OR DEF:03");
     expect(result.diagnostics).toHaveLength(0);
     expect(result.expression).not.toBeNull();
   });
@@ -162,33 +162,33 @@ describe("parseExpression — explicit syntax", () => {
 
 describe("stringifyExpression — explicit mode", () => {
   it("should stringify a single variable", () => {
-    const result = parseExpression("+ABC01");
+    const result = parseExpression("ABC:01");
     const str = stringifyExpression(result.expression!, SyntaxMode.Explicit);
-    expect(str).toBe("+ABC01");
+    expect(str).toBe("ABC:01");
   });
 
   it("should stringify AND with lowercase operator", () => {
-    const result = parseExpression("+ABC01 and -XYZ02");
+    const result = parseExpression("ABC:01 and XYZ!02");
     const str = stringifyExpression(result.expression!, SyntaxMode.Explicit);
-    expect(str).toBe("+ABC01 and -XYZ02");
+    expect(str).toBe("ABC:01 and XYZ!02");
   });
 
   it("should stringify OR with lowercase operator", () => {
-    const result = parseExpression("+ABC01 or -XYZ02");
+    const result = parseExpression("ABC:01 or XYZ!02");
     const str = stringifyExpression(result.expression!, SyntaxMode.Explicit);
-    expect(str).toBe("+ABC01 or -XYZ02");
+    expect(str).toBe("ABC:01 or XYZ!02");
   });
 
   it("should add parentheses for OR inside AND", () => {
-    const result = parseExpression("+ABC01 and (+XYZ02 or +DEF03)");
+    const result = parseExpression("ABC:01 and (XYZ:02 or DEF:03)");
     const str = stringifyExpression(result.expression!, SyntaxMode.Explicit);
-    expect(str).toBe("+ABC01 and (+XYZ02 or +DEF03)");
+    expect(str).toBe("ABC:01 and (XYZ:02 or DEF:03)");
   });
 
   it("should output codes in uppercase", () => {
-    const result = parseExpression("+abc01 and -xyz02");
+    const result = parseExpression("abc:01 and xyz!02");
     const str = stringifyExpression(result.expression!, SyntaxMode.Explicit);
-    expect(str).toBe("+ABC01 and -XYZ02");
+    expect(str).toBe("ABC:01 and XYZ!02");
   });
 });
 
@@ -233,7 +233,7 @@ describe("stringifyExpression — condensed mode", () => {
     };
 
     const str = stringifyExpression(expression, SyntaxMode.Condensed);
-    expect(str).toContain("(+ABC01 or -XYZ02)");
+    expect(str).toContain("(ABC:01 or XYZ!02)");
     expect(str).toContain("+DEF03");
   });
 
@@ -260,9 +260,9 @@ describe("stringifyExpression — condensed mode", () => {
 
 describe("roundtrip: parse → stringify → parse", () => {
   const inputs = [
-    "+ABC01 and -XYZ02",
-    "(+ABC01 or -XYZ02) and +DEF03",
-    "(-ABC01 and -AXB02 and +XYZB1) or (-ADEXX and +ABC02)",
+    "ABC:01 and XYZ!02",
+    "(ABC:01 or XYZ!02) and DEF:03",
+    "(ABC!01 and AXB!02 and XYZ:B1) or (ADE!XX and ABC:02)",
   ];
 
   for (const input of inputs) {

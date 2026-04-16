@@ -1,0 +1,5 @@
+AB:C01 and XYZ:02
+and DEF:03 and GHI:04
+and ABC:01 and XYZ!03
+and ABC:01 and XYZ!04
+and DEF:03 and GHI:08 and BOE:00 and B0K!22 and BOJ:44
