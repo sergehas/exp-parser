@@ -40,6 +40,12 @@ export class ParseController extends AbstractController<ParseContext> {
     );
     logger.info(`  stats: ${JSON.stringify(expanded.stats)}`);
 
+    const expanded2 = expandExpression(ast, NormalForm.Cnf);
+    logger.info(
+      `Expanded (CNF) : ${stringifyExpression(expanded2.expression, SyntaxMode.Explicit)}`
+    );
+    logger.info(`  stats: ${JSON.stringify(expanded2.stats)}`);
+
     const factorized = factorizeExpression(ast);
     logger.info(`Factorized : ${stringifyExpression(factorized.expression, SyntaxMode.Explicit)}`);
     logger.info(`  stats: ${JSON.stringify(factorized.stats)}`);

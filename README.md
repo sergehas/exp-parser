@@ -24,7 +24,7 @@ hint: using a DSL, parser/lexer/normalize/transform , building an AST, may be a 
 example expression to parse (condensed syntax)
 
 ```text
--ABC01 -AXC02 +XYZB1 +AAA01 +AAA02-ADEXX +ABC02
+-ABC01 -AXC02 +XYZB1 +AAA01 +AAA02 -ADEXX +ABC02
 ```
 
 which means:
@@ -143,8 +143,8 @@ Use `-f` to pass a file containing the expression instead of `-e`. The file may 
 # expr.txt contains:
 #   +ABC01 -XYZ02
 #   +DEF03 +GHI04
-npx ts-node .\src\main.ts parse -f .\expr.txt
-npx ts-node .\src\main.ts parse -vvv -f .\expr.txt
+npx ts-node .\src\main.ts parse -f .\test\exp1.txt
+npx ts-node .\src\main.ts parse -vvv -f .\test\exp1.txt
 ```
 
 > `-e` and `-f` are mutually exclusive — only one may be provided per invocation.
