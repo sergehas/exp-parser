@@ -17,8 +17,14 @@ applyTo: "**"
 - Implement proper error boundaries in React components
 - Always log errors with contextual information
 
-## Code quality
+## Code Complexity
 
-- document all public methods and classes
+- Avoid deeply nested code and long functions
+- Break down complex logic into smaller, reusable functions
+- Ensure cognitive complexity is less than 15 for any function or method
+
+## Code Quality
+
+- Document all public methods and classes
 - Write unit tests for all components and utility functions
 - Ensure the code is syntactically correct, bug-free, optimized, not span multiple lines unnecessarily, and prefer to use standard libraries.
