@@ -1,0 +1,4 @@
+ABC:01 and XYZ:02 or
+ABC:01 and XYZ:03 or
+ABC:01 and XYZ:04 or
+DEF:01 and ABC:01

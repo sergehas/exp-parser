@@ -578,4 +578,46 @@ describe("transform internals with mocked normalize behavior", () => {
 
     expect(result.stats.rewrites).toBeGreaterThanOrEqual(0);
   });
+
+  it("should factorize when grouped terms include zero and multi-factor remainders", async () => {
+    const a = makeNamedVar("AAA");
+    const b = makeNamedVar("BBB");
+    const c = makeNamedVar("CCC");
+    const t1 = makeNamedVar("T1");
+    const t2 = makeNamedVar("T2");
+
+    jest.spyOn(normalize, "canonicalizeExpression").mockImplementation((expr: BoolExpr) => expr);
+    jest.spyOn(normalize, "expressionKey").mockImplementation((expr: BoolExpr) => {
+      if (expr === a) {
+        return "A";
+      }
+      if (expr === b) {
+        return "B";
+      }
+      if (expr === c) {
+        return "C";
+      }
+      return "T";
+    });
+    jest
+      .spyOn(normalize, "extractTerms")
+      .mockImplementation((expr: BoolExpr, operator: BinaryOperator) => {
+        if (operator === BinaryOperator.Or) {
+          return [t1, t2];
+        }
+        if (operator === BinaryOperator.And && expr === t1) {
+          return [a];
+        }
+        if (operator === BinaryOperator.And && expr === t2) {
+          return [a, b, c];
+        }
+        return [expr];
+      });
+
+    const result = factorizeExpression(makeSimpleBin(BinaryOperator.Or, t1, t2));
+    const commonFactor = findFactoredCommonFactor(result.expression);
+
+    expect(result.stats.rewrites).toBeGreaterThan(0);
+    expect(commonFactor).toBe(a);
+  });
 });

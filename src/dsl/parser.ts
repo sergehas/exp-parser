@@ -183,7 +183,7 @@ class ExplicitParser {
    * Equals sign produces an OR-chain; NotEquals sign produces an AND-chain.
    *
    * @param token The IN token containing code, sign, and values.
-   * @returns Desugared expression chain or null on error.
+   * @returns Desugared (more primitive form) expression chain or null on error.
    */
   private buildInChain(token: Token): BoolExpr | null {
     const code = token.code ?? "";
@@ -422,7 +422,7 @@ function stringifyExplicit(expression: BoolExpr, parentPrecedence: number): stri
     return explicitVariableToString(expression.sign, expression.code, expression.value);
   }
 
-  const inResult = tryStringifyIn(expression);
+  const inResult = tryStringifyIn(expression, parentPrecedence);
   if (inResult !== null) {
     return inResult;
   }
@@ -445,14 +445,12 @@ function stringifyExplicit(expression: BoolExpr, parentPrecedence: number): stri
  * @param expression Binary expression to attempt folding.
  * @returns IN-syntax string if foldable, or null otherwise.
  */
-function tryStringifyIn(expression: BoolExpr): string | null {
+function tryStringifyIn(expression: BoolExpr, parentPrecedence: number): string | null {
   if (!isBinaryExpr(expression)) {
     return null;
   }
 
-  const isOrEquals = expression.operator === BinaryOperator.Or;
-  const isAndNotEquals = expression.operator === BinaryOperator.And;
-  if (!isOrEquals && !isAndNotEquals) {
+  if (!supportsInFolding(expression.operator)) {
     return null;
   }
 
@@ -465,30 +463,167 @@ function tryStringifyIn(expression: BoolExpr): string | null {
     return null;
   }
 
-  const firstCode = terms[0].kind === ExprKind.Variable ? terms[0].code : null;
-  const firstSign = terms[0].kind === ExprKind.Variable ? terms[0].sign : null;
+  const operatorToken = expression.operator === BinaryOperator.And ? "and" : "or";
+  const currentPrecedence = expression.operator === BinaryOperator.And ? 20 : 10;
 
-  if (firstCode === null || firstSign === null) {
+  const foldResult = renderTermsWithInFolding(terms, expression.operator);
+  if (foldResult === null) {
     return null;
   }
 
-  if (isOrEquals && firstSign !== VariableSign.Equals) {
-    return null;
-  }
-  if (isAndNotEquals && firstSign !== VariableSign.NotEquals) {
+  if (!foldResult.hasAnyFold) {
     return null;
   }
 
-  const allMatch = terms.every(
-    (t) => t.kind === ExprKind.Variable && t.code === firstCode && t.sign === firstSign
+  const content = foldResult.renderedTerms.join(` ${operatorToken} `);
+  if (currentPrecedence < parentPrecedence && foldResult.renderedTerms.length > 1) {
+    return `(${content})`;
+  }
+
+  return content;
+}
+
+interface FoldRenderResult {
+  readonly renderedTerms: readonly string[];
+  readonly hasAnyFold: boolean;
+}
+
+interface VariableRun {
+  readonly variable: BoolExpr & { readonly kind: ExprKind.Variable };
+  readonly nextIndex: number;
+}
+
+/**
+ * Indicates whether a binary operator can participate in IN-folding.
+ *
+ * @param operator Operator candidate.
+ * @returns True when the operator supports folding.
+ */
+function supportsInFolding(operator: BinaryOperator): boolean {
+  return operator === BinaryOperator.Or || operator === BinaryOperator.And;
+}
+
+/**
+ * Renders terms with opportunistic IN-folding for compatible variable runs.
+ *
+ * @param terms Flat list of terms connected by a shared operator.
+ * @param operator Shared operator connecting the terms.
+ * @returns Render result, or null when a term cannot be rendered as a variable.
+ */
+function renderTermsWithInFolding(
+  terms: readonly BoolExpr[],
+  operator: BinaryOperator
+): FoldRenderResult | null {
+  const renderedTerms: string[] = [];
+  let hasAnyFold = false;
+  let index = 0;
+
+  while (index < terms.length) {
+    const run = collectVariableRun(terms, index);
+    if (run === null) {
+      return null;
+    }
+
+    if (canFoldVariableRun(operator, run.variable.sign, index, run.nextIndex)) {
+      hasAnyFold = true;
+      renderedTerms.push(renderFoldedVariableRun(terms, run.variable, index, run.nextIndex));
+      index = run.nextIndex;
+      continue;
+    }
+
+    renderedTerms.push(
+      explicitVariableToString(run.variable.sign, run.variable.code, run.variable.value)
+    );
+    index += 1;
+  }
+
+  return { renderedTerms, hasAnyFold };
+}
+
+/**
+ * Collects a contiguous run of same-code/same-sign variable terms.
+ *
+ * @param terms Ordered term list.
+ * @param startIndex Index where the run starts.
+ * @returns Run metadata, or null when the start term is not a variable.
+ */
+function collectVariableRun(terms: readonly BoolExpr[], startIndex: number): VariableRun | null {
+  const variable = terms[startIndex];
+  if (variable?.kind !== ExprKind.Variable) {
+    return null;
+  }
+
+  let nextIndex = startIndex + 1;
+  while (matchesVariableRun(variable, terms[nextIndex])) {
+    nextIndex += 1;
+  }
+
+  return { variable, nextIndex };
+}
+
+/**
+ * Checks whether a candidate variable extends the current variable run.
+ *
+ * @param variable Run anchor variable.
+ * @param candidate Neighbor term to validate.
+ * @returns True when candidate has matching kind, code, and sign.
+ */
+function matchesVariableRun(
+  variable: BoolExpr & { readonly kind: ExprKind.Variable },
+  candidate: BoolExpr | undefined
+): candidate is BoolExpr & { readonly kind: ExprKind.Variable } {
+  return (
+    candidate?.kind === ExprKind.Variable &&
+    candidate.code === variable.code &&
+    candidate.sign === variable.sign
   );
-  if (!allMatch) {
-    return null;
+}
+
+/**
+ * Determines whether a variable run is eligible for IN-folding.
+ *
+ * @param operator Shared operator for the surrounding term list.
+ * @param sign Variable sign used by the run.
+ * @param startIndex Inclusive run start index.
+ * @param nextIndex Exclusive run end index.
+ * @returns True when the run should be folded into IN syntax.
+ */
+function canFoldVariableRun(
+  operator: BinaryOperator,
+  sign: VariableSign,
+  startIndex: number,
+  nextIndex: number
+): boolean {
+  if (nextIndex - startIndex <= 1) {
+    return false;
   }
 
-  const values = terms.map((t) => (t.kind === ExprKind.Variable ? t.value.toUpperCase() : ""));
-  const separator = firstSign === VariableSign.Equals ? ":" : "!";
-  return `${firstCode.toUpperCase()}${separator}(${values.join(" ")})`;
+  return (
+    (operator === BinaryOperator.Or && sign === VariableSign.Equals) ||
+    (operator === BinaryOperator.And && sign === VariableSign.NotEquals)
+  );
+}
+
+/**
+ * Renders a foldable variable run as explicit IN syntax.
+ *
+ * @param terms Source term list.
+ * @param variable Run anchor variable.
+ * @param startIndex Inclusive run start index.
+ * @param nextIndex Exclusive run end index.
+ * @returns Folded IN representation for the variable run.
+ */
+function renderFoldedVariableRun(
+  terms: readonly BoolExpr[],
+  variable: BoolExpr & { readonly kind: ExprKind.Variable },
+  startIndex: number,
+  nextIndex: number
+): string {
+  const values = terms
+    .slice(startIndex, nextIndex)
+    .map((term) => (term.kind === ExprKind.Variable ? term.value.toUpperCase() : ""));
+  const separator = variable.sign === VariableSign.Equals ? ":" : "!";
+  return `${variable.code.toUpperCase()}${separator}(${values.join(" ")})`;
 }
 
 /**
