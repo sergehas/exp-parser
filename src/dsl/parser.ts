@@ -422,7 +422,7 @@ function stringifyExplicit(expression: BoolExpr, parentPrecedence: number): stri
     return explicitVariableToString(expression.sign, expression.code, expression.value);
   }
 
-  const inResult = tryStringifyIn(expression);
+  const inResult = tryStringifyIn(expression, parentPrecedence);
   if (inResult !== null) {
     return inResult;
   }
@@ -445,7 +445,7 @@ function stringifyExplicit(expression: BoolExpr, parentPrecedence: number): stri
  * @param expression Binary expression to attempt folding.
  * @returns IN-syntax string if foldable, or null otherwise.
  */
-function tryStringifyIn(expression: BoolExpr): string | null {
+function tryStringifyIn(expression: BoolExpr, parentPrecedence: number): string | null {
   if (!isBinaryExpr(expression)) {
     return null;
   }
@@ -465,30 +465,63 @@ function tryStringifyIn(expression: BoolExpr): string | null {
     return null;
   }
 
-  const firstCode = terms[0].kind === ExprKind.Variable ? terms[0].code : null;
-  const firstSign = terms[0].kind === ExprKind.Variable ? terms[0].sign : null;
+  const operatorToken = expression.operator === BinaryOperator.And ? "and" : "or";
+  const currentPrecedence = expression.operator === BinaryOperator.And ? 20 : 10;
 
-  if (firstCode === null || firstSign === null) {
+  const renderedTerms: string[] = [];
+  let hasAnyFold = false;
+
+  let index = 0;
+  while (index < terms.length) {
+    const current = terms[index];
+    if (current.kind !== ExprKind.Variable) {
+      return null;
+    }
+
+    let nextIndex = index + 1;
+    while (nextIndex < terms.length) {
+      const candidate = terms[nextIndex];
+      if (
+        candidate.kind !== ExprKind.Variable ||
+        candidate.code !== current.code ||
+        candidate.sign !== current.sign
+      ) {
+        break;
+      }
+      nextIndex += 1;
+    }
+
+    const runLength = nextIndex - index;
+    const isFoldableRun =
+      runLength > 1 &&
+      ((isOrEquals && current.sign === VariableSign.Equals) ||
+        (isAndNotEquals && current.sign === VariableSign.NotEquals));
+
+    if (isFoldableRun) {
+      hasAnyFold = true;
+      const values = terms
+        .slice(index, nextIndex)
+        .map((t) => (t.kind === ExprKind.Variable ? t.value.toUpperCase() : ""));
+      const separator = current.sign === VariableSign.Equals ? ":" : "!";
+      renderedTerms.push(`${current.code.toUpperCase()}${separator}(${values.join(" ")})`);
+      index = nextIndex;
+      continue;
+    }
+
+    renderedTerms.push(explicitVariableToString(current.sign, current.code, current.value));
+    index += 1;
+  }
+
+  if (!hasAnyFold) {
     return null;
   }
 
-  if (isOrEquals && firstSign !== VariableSign.Equals) {
-    return null;
-  }
-  if (isAndNotEquals && firstSign !== VariableSign.NotEquals) {
-    return null;
+  const content = renderedTerms.join(` ${operatorToken} `);
+  if (currentPrecedence < parentPrecedence && renderedTerms.length > 1) {
+    return `(${content})`;
   }
 
-  const allMatch = terms.every(
-    (t) => t.kind === ExprKind.Variable && t.code === firstCode && t.sign === firstSign
-  );
-  if (!allMatch) {
-    return null;
-  }
-
-  const values = terms.map((t) => (t.kind === ExprKind.Variable ? t.value.toUpperCase() : ""));
-  const separator = firstSign === VariableSign.Equals ? ":" : "!";
-  return `${firstCode.toUpperCase()}${separator}(${values.join(" ")})`;
+  return content;
 }
 
 /**

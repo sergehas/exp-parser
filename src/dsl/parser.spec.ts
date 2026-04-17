@@ -2,6 +2,7 @@ import * as detect from "./detect";
 import { SyntaxMode } from "./detect";
 import * as lexer from "./lexer";
 import { parseExpression, stringifyExpression } from "./parser";
+import { factorizeExpression } from "./transform";
 
 import { TokenType } from "./lexer";
 import {
@@ -358,6 +359,38 @@ describe("stringifyExpression — IN folding", () => {
     const result = parseExpression("ABC:01 and ABC:02");
     const str = stringifyExpression(result.expression!, SyntaxMode.Explicit);
     expect(str).toBe("ABC:01 and ABC:02");
+  });
+
+  it("should partially fold OR-chain with mixed codes", () => {
+    const result = parseExpression("DEF:01 or XYZ:02 or XYZ:03 or XYZ:04");
+    const str = stringifyExpression(result.expression!, SyntaxMode.Explicit);
+    expect(str).toBe("DEF:01 or XYZ:(02 03 04)");
+  });
+
+  it("should partially fold NOT IN inside AND-chain with mixed codes", () => {
+    const result = parseExpression("DEF!01 and XYZ!02 and XYZ!03 and XYZ!04");
+    const str = stringifyExpression(result.expression!, SyntaxMode.Explicit);
+    expect(str).toBe("DEF!01 and XYZ!(02 03 04)");
+  });
+
+  it("should keep precedence when partially folding OR inside AND", () => {
+    const result = parseExpression("(DEF:01 or XYZ:02 or XYZ:03 or XYZ:04) and ABC:01");
+    const str = stringifyExpression(result.expression!, SyntaxMode.Explicit);
+    expect(str).toBe("(DEF:01 or XYZ:(02 03 04)) and ABC:01");
+  });
+
+  it("should preserve IN grouping after factorization with extra OR term", () => {
+    const parsed = parseExpression(
+      "ABC:01 and XYZ:02 or ABC:01 and XYZ:03 or ABC:01 and XYZ:04 or DEF:01 and ABC:01"
+    );
+
+    expect(parsed.diagnostics).toHaveLength(0);
+    expect(parsed.expression).not.toBeNull();
+
+    const factorized = factorizeExpression(parsed.expression!);
+    const str = stringifyExpression(factorized.expression, SyntaxMode.Explicit);
+
+    expect(str).toBe("(DEF:01 or XYZ:(02 03 04)) and ABC:01");
   });
 });
 
