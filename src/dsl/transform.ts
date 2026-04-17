@@ -113,109 +113,15 @@ function expandRecursive(
 
   const left = expandRecursive(expression.left, form, limits, stats);
   const right = expandRecursive(expression.right, form, limits, stats);
-  const node: BoolExpr = { ...expression, left, right };
-
-  if (form === NormalForm.Dnf && isBinaryExpr(node) && node.operator === BinaryOperator.And) {
-    if (isBinaryExpr(left) && left.operator === BinaryOperator.Or) {
-      stats.rewrites += 1;
-      assertRewriteLimit(limits, stats);
-      return {
-        kind: ExprKind.Binary,
-        operator: BinaryOperator.Or,
-        left: {
-          kind: ExprKind.Binary,
-          operator: BinaryOperator.And,
-          left: left.left,
-          right,
-          span: mergeSpan(left.left.span, right.span),
-        },
-        right: {
-          kind: ExprKind.Binary,
-          operator: BinaryOperator.And,
-          left: left.right,
-          right,
-          span: mergeSpan(left.right.span, right.span),
-        },
-        span: mergeSpan(left.span, right.span),
-      };
-    }
-
-    if (isBinaryExpr(right) && right.operator === BinaryOperator.Or) {
-      stats.rewrites += 1;
-      assertRewriteLimit(limits, stats);
-      return {
-        kind: ExprKind.Binary,
-        operator: BinaryOperator.Or,
-        left: {
-          kind: ExprKind.Binary,
-          operator: BinaryOperator.And,
-          left,
-          right: right.left,
-          span: mergeSpan(left.span, right.left.span),
-        },
-        right: {
-          kind: ExprKind.Binary,
-          operator: BinaryOperator.And,
-          left,
-          right: right.right,
-          span: mergeSpan(left.span, right.right.span),
-        },
-        span: mergeSpan(left.span, right.span),
-      };
-    }
+  const node = { ...expression, left, right };
+  const distributed = tryDistributeExpression(node, form);
+  if (distributed === null) {
+    return node;
   }
 
-  if (form === NormalForm.Cnf && isBinaryExpr(node) && node.operator === BinaryOperator.Or) {
-    if (isBinaryExpr(left) && left.operator === BinaryOperator.And) {
-      stats.rewrites += 1;
-      assertRewriteLimit(limits, stats);
-      return {
-        kind: ExprKind.Binary,
-        operator: BinaryOperator.And,
-        left: {
-          kind: ExprKind.Binary,
-          operator: BinaryOperator.Or,
-          left: left.left,
-          right,
-          span: mergeSpan(left.left.span, right.span),
-        },
-        right: {
-          kind: ExprKind.Binary,
-          operator: BinaryOperator.Or,
-          left: left.right,
-          right,
-          span: mergeSpan(left.right.span, right.span),
-        },
-        span: mergeSpan(left.span, right.span),
-      };
-    }
-
-    if (isBinaryExpr(right) && right.operator === BinaryOperator.And) {
-      stats.rewrites += 1;
-      assertRewriteLimit(limits, stats);
-      return {
-        kind: ExprKind.Binary,
-        operator: BinaryOperator.And,
-        left: {
-          kind: ExprKind.Binary,
-          operator: BinaryOperator.Or,
-          left,
-          right: right.left,
-          span: mergeSpan(left.span, right.left.span),
-        },
-        right: {
-          kind: ExprKind.Binary,
-          operator: BinaryOperator.Or,
-          left,
-          right: right.right,
-          span: mergeSpan(left.span, right.right.span),
-        },
-        span: mergeSpan(left.span, right.span),
-      };
-    }
-  }
-
-  return node;
+  stats.rewrites += 1;
+  assertRewriteLimit(limits, stats);
+  return distributed;
 }
 
 // ---------------------------------------------------------------------------
@@ -279,56 +185,17 @@ function factorizeOuter(
     return null;
   }
 
-  const frequency = new Map<string, { count: number; expr: BoolExpr }>();
-  for (const term of terms) {
-    const factors = new Map<string, BoolExpr>();
-    for (const factor of extractTerms(term, innerOperator)) {
-      factors.set(expressionKey(factor), factor);
-    }
-
-    for (const [key, factor] of factors.entries()) {
-      const current = frequency.get(key);
-      if (current === undefined) {
-        frequency.set(key, { count: 1, expr: factor });
-      } else {
-        current.count += 1;
-      }
-    }
-  }
-
-  const best = [...frequency.values()]
-    .filter((v) => v.count >= 2)
-    .sort(
-      (a, b) =>
-        b.count - a.count ||
-        factorPriority(a.expr) - factorPriority(b.expr) ||
-        expressionKey(a.expr).localeCompare(expressionKey(b.expr))
-    )[0];
+  const best = selectBestFactor(buildFactorFrequency(terms, innerOperator));
   if (best === undefined) {
     return null;
   }
 
-  const commonKey = expressionKey(best.expr);
-  const grouped: BoolExpr[] = [];
-  const otherTerms: BoolExpr[] = [];
-
-  for (const term of terms) {
-    const factors = extractTerms(term, innerOperator);
-    const remaining = factors.filter((f) => expressionKey(f) !== commonKey);
-    const hasCommonFactor = remaining.length !== factors.length;
-    if (!hasCommonFactor) {
-      otherTerms.push(term);
-      continue;
-    }
-
-    if (remaining.length === 0) {
-      grouped.push(best.expr);
-    } else if (remaining.length === 1) {
-      grouped.push(remaining[0]);
-    } else {
-      grouped.push(buildChain(remaining, innerOperator));
-    }
-  }
+  const { grouped, otherTerms } = partitionTermsByFactor(
+    terms,
+    innerOperator,
+    expressionKey(best.expr),
+    best.expr
+  );
 
   if (grouped.length < 2) {
     return null;
@@ -375,9 +242,212 @@ function factorPriority(expression: BoolExpr): number {
   return 2;
 }
 
+/**
+ * Attempts a single distribution step based on the requested normal form.
+ *
+ * @param expression Candidate expression node.
+ * @param form Target normal form.
+ * @returns Distributed expression, or null when no rule applies.
+ */
+function tryDistributeExpression(expression: BoolExpr, form: NormalForm): BoolExpr | null {
+  if (!isBinaryExpr(expression)) {
+    return null;
+  }
+
+  const distribution =
+    form === NormalForm.Dnf
+      ? {
+          outerOperator: BinaryOperator.And,
+          branchOperator: BinaryOperator.Or,
+        }
+      : {
+          outerOperator: BinaryOperator.Or,
+          branchOperator: BinaryOperator.And,
+        };
+
+  if (expression.operator !== distribution.outerOperator) {
+    return null;
+  }
+
+  return (
+    distributeAcrossSide(
+      expression.left,
+      expression.right,
+      distribution.branchOperator,
+      distribution.outerOperator,
+      true
+    ) ??
+    distributeAcrossSide(
+      expression.right,
+      expression.left,
+      distribution.branchOperator,
+      distribution.outerOperator,
+      false
+    )
+  );
+}
+
+/**
+ * Distributes a shared expression across both branches of a binary candidate.
+ *
+ * @param branchCandidate Side expected to contain the branch operator.
+ * @param shared Expression replicated into both distributed branches.
+ * @param branchOperator Operator required on the branching side.
+ * @param innerOperator Operator used inside each distributed branch.
+ * @param branchOnLeft Indicates whether branchCandidate is the left operand.
+ * @returns Distributed expression, or null when branching preconditions fail.
+ */
+function distributeAcrossSide(
+  branchCandidate: BoolExpr,
+  shared: BoolExpr,
+  branchOperator: BinaryOperator,
+  innerOperator: BinaryOperator,
+  branchOnLeft: boolean
+): BoolExpr | null {
+  if (!isBinaryExpr(branchCandidate) || branchCandidate.operator !== branchOperator) {
+    return null;
+  }
+
+  const leftBranch = branchOnLeft
+    ? buildBinary(innerOperator, branchCandidate.left, shared)
+    : buildBinary(innerOperator, shared, branchCandidate.left);
+  const rightBranch = branchOnLeft
+    ? buildBinary(innerOperator, branchCandidate.right, shared)
+    : buildBinary(innerOperator, shared, branchCandidate.right);
+
+  return buildBinary(branchOperator, leftBranch, rightBranch);
+}
+
+/**
+ * Builds factor occurrence counts across outer terms.
+ *
+ * @param terms Outer terms to inspect.
+ * @param innerOperator Operator used to extract factors per term.
+ * @returns Frequency table keyed by canonical expression key.
+ */
+function buildFactorFrequency(
+  terms: readonly BoolExpr[],
+  innerOperator: BinaryOperator
+): Map<string, { count: number; expr: BoolExpr }> {
+  const frequency = new Map<string, { count: number; expr: BoolExpr }>();
+
+  for (const term of terms) {
+    const uniqueFactors = new Map<string, BoolExpr>();
+    for (const factor of extractTerms(term, innerOperator)) {
+      uniqueFactors.set(expressionKey(factor), factor);
+    }
+
+    for (const [key, factor] of uniqueFactors.entries()) {
+      const current = frequency.get(key);
+      if (current === undefined) {
+        frequency.set(key, { count: 1, expr: factor });
+        continue;
+      }
+
+      current.count += 1;
+    }
+  }
+
+  return frequency;
+}
+
+/**
+ * Selects the best common factor candidate from a frequency table.
+ *
+ * @param frequency Frequency table of candidate factors.
+ * @returns Best candidate occurring in at least two terms, if any.
+ */
+function selectBestFactor(
+  frequency: Map<string, { count: number; expr: BoolExpr }>
+): { count: number; expr: BoolExpr } | undefined {
+  return [...frequency.values()]
+    .filter((value) => value.count >= 2)
+    .sort(
+      (a, b) =>
+        b.count - a.count ||
+        factorPriority(a.expr) - factorPriority(b.expr) ||
+        expressionKey(a.expr).localeCompare(expressionKey(b.expr))
+    )[0];
+}
+
+/**
+ * Splits terms into those containing the common factor and all others.
+ *
+ * @param terms Outer terms to partition.
+ * @param innerOperator Operator used to extract factors from each term.
+ * @param commonKey Canonical key for the common factor.
+ * @param commonFactor Common factor expression used when a term becomes empty.
+ * @returns Grouped terms and untouched terms.
+ */
+function partitionTermsByFactor(
+  terms: readonly BoolExpr[],
+  innerOperator: BinaryOperator,
+  commonKey: string,
+  commonFactor: BoolExpr
+): { grouped: BoolExpr[]; otherTerms: BoolExpr[] } {
+  const grouped: BoolExpr[] = [];
+  const otherTerms: BoolExpr[] = [];
+
+  for (const term of terms) {
+    const factors = extractTerms(term, innerOperator);
+    const remaining = factors.filter((factor) => expressionKey(factor) !== commonKey);
+
+    if (remaining.length === factors.length) {
+      otherTerms.push(term);
+      continue;
+    }
+
+    grouped.push(buildRemainingFactors(remaining, innerOperator, commonFactor));
+  }
+
+  return { grouped, otherTerms };
+}
+
+/**
+ * Rebuilds a term from remaining factors after removing a common factor.
+ *
+ * @param remaining Factors left in the term.
+ * @param operator Operator used to reconnect remaining factors.
+ * @param commonFactor Common factor fallback when no factors remain.
+ * @returns Reconstructed term.
+ */
+function buildRemainingFactors(
+  remaining: readonly BoolExpr[],
+  operator: BinaryOperator,
+  commonFactor: BoolExpr
+): BoolExpr {
+  if (remaining.length === 0) {
+    return commonFactor;
+  }
+
+  if (remaining.length === 1) {
+    return remaining[0];
+  }
+
+  return buildChain(remaining, operator);
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/**
+ * Creates a binary AST node and merges operand spans.
+ *
+ * @param operator Binary operator.
+ * @param left Left operand.
+ * @param right Right operand.
+ * @returns Binary expression node.
+ */
+function buildBinary(operator: BinaryOperator, left: BoolExpr, right: BoolExpr): BoolExpr {
+  return {
+    kind: ExprKind.Binary,
+    operator,
+    left,
+    right,
+    span: mergeSpan(left.span, right.span),
+  };
+}
 
 /**
  * Builds a left-associative chain with a shared operator.
