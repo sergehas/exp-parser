@@ -36,25 +36,23 @@ which means:
 Same expression, but explicit syntax :
 
 ```text
-(-ABC01 and -AXBC02 and +XYZB1 and +AAA01 and +AAA02) or (-ADEXX and +ABC02)
+(ABC:01 and AXC!02 and XYZ:B1 and AAA:01 and AAA:02) or (ADE!XX and ABC:02)
 ```
-
-in both syntaxes:
-
-- `-` means `not equals`
-- `+` means `equals`
 
 in condensed syntax :
 
+- `-` means `not equals`
+- `+` means `equals`
 - `' '` means `and`
 - `\r` means `or`
 - each line is implicitly a group as if it was surrounded with parenthesis
 
 in explicit syntax
 
+- `:` means `not equals`
+- `!` means `equals`
 - and `and` and `or` operator are mandatory
 - parenthesis are explicit
-- the meaning of `-` and `+` are the same as in condensed syntax
 - grouping is done with explicit parenthesis
 - `' '` is a separator
 - `\n` is also a separator and has no meaning specific meaning
@@ -70,7 +68,7 @@ the 2 syntaxes cannot be mixed
 #### Examples
 
 - `+ABC01 and -XYZ02`
-- `(+ABC01 or -XYZ02) and +DEF03`
+- `(ABC:01 or XYZ:02) and DEF:03`
 - multi line
 
     ```text
@@ -121,8 +119,8 @@ npx ts-node .\src\main.ts parse -vvvv -e "+ABC01 -XYZ02\n+ABC01 +GHI04\n+DEF03 +
 Uses `and` / `or` keywords and parentheses:
 
 ```powershell
-npx ts-node .\src\main.ts parse -vvvv -e "+ABC01 and -XYZ02"
-npx ts-node .\src\main.ts parse -vvv -e "(+ABC01 or -XYZ02) and +DEF03"
+npx ts-node .\src\main.ts parse -vvvv -e "ABC:01 and XYZ!02"
+npx ts-node .\src\main.ts parse -vvv -e "(ABC:01 or XYZ!02) and DEF:03"
 ```
 
 #### Verbose output
@@ -130,7 +128,7 @@ npx ts-node .\src\main.ts parse -vvv -e "(+ABC01 or -XYZ02) and +DEF03"
 Add `-v` flags to increase verbosity (up to `-vvvvv`):
 
 ```powershell
-npx ts-node .\src\main.ts parse -e "+ABC01 and -XYZ02" -vvv
+npx ts-node .\src\main.ts parse -e "ABC:01 and XYZ:02" -vvv
 ```
 
 The output shows the parsed expression in both syntaxes, the expanded Disjunctive Normal Form (DNF), and the factorized form.

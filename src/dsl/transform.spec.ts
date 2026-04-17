@@ -150,14 +150,14 @@ describe("factorizeExpression", () => {
   });
 
   it("should factorize a parsed explicit expression", () => {
-    const parsed = parseExpression("(+ABC01 and +XYZ02) or (+ABC01 and +DEF03)");
+    const parsed = parseExpression("(ABC:01 and XYZ:02) or (ABC:01 and DEF:03)");
     expect(parsed.expression).not.toBeNull();
 
     const result = factorizeExpression(parsed.expression!);
     const str = stringifyExpression(result.expression, SyntaxMode.Explicit);
     // Should contain the common factor ABC01
-    expect(str).toContain("+ABC01");
-    // And should be factored: +ABC01 and (+XYZ02 or +DEF03) or similar
+    expect(str).toContain("ABC:01");
+    // And should be factored: ABC:01 and (XYZ:02 or DEF:03) or similar
     expect(result.stats.rewrites).toBeGreaterThan(0);
   });
 
@@ -180,7 +180,7 @@ describe("factorizeExpression", () => {
   });
 
   it("should collapse duplicate OR branches before factorization", () => {
-    const parsed = parseExpression("+AAA01 or +AAA01");
+    const parsed = parseExpression("AAA:01 or AAA:01");
     expect(parsed.expression).not.toBeNull();
 
     const result = factorizeExpression(parsed.expression!);
@@ -205,14 +205,14 @@ describe("factorizeExpression", () => {
 describe("domain-aware factorization", () => {
   it("should extract common code across OR branches", () => {
     // (ABC=01 AND XYZ=B1) OR (ABC=02 AND XYZ=B1) → XYZ=B1 AND (ABC=01 OR ABC=02)
-    const parsed = parseExpression("(+ABC01 and +XYZB1) or (+ABC02 and +XYZB1)");
+    const parsed = parseExpression("(ABC:01 and XYZ:B1) or (ABC:02 and XYZ:B1)");
     expect(parsed.expression).not.toBeNull();
 
     const result = factorizeExpression(parsed.expression!);
     const str = stringifyExpression(result.expression, SyntaxMode.Explicit);
 
     // XYZB1 should be factored out
-    expect(str).toContain("+XYZB1");
+    expect(str).toContain("XYZ:B1");
     expect(result.stats.rewrites).toBeGreaterThan(0);
 
     // Check structure: the common factor XYZ=B1 should appear once
@@ -240,20 +240,20 @@ describe("domain-aware factorization", () => {
 
   it("should factorize while preserving non-matching terms", () => {
     const parsed = parseExpression(
-      "+AAA01 or (+AAA01 and +BBB01) or (+AAA01 and +CCC01) or (+DDD01 and +EEE01)"
+      "AAA:01 or (AAA:01 and BBB:01) or (AAA:01 and CCC:01) or (DDD:01 and EEE:01)"
     );
     expect(parsed.expression).not.toBeNull();
 
     const result = factorizeExpression(parsed.expression!);
     const str = stringifyExpression(result.expression, SyntaxMode.Explicit);
 
-    expect(str).toContain("+DDD01 and +EEE01");
-    expect(str).toContain("+AAA01");
+    expect(str).toContain("DDD:01 and EEE:01");
+    expect(str).toContain("AAA:01");
   });
 
   it("should handle tie-breaking between equally frequent factors", () => {
     const parsed = parseExpression(
-      "(+AAA01 and +XXX01) or (+AAA01 and +YYY01) or (+BBB01 and +XXX01) or (+BBB01 and +YYY01)"
+      "(AAA:01 and XXX:01) or (AAA:01 and YYY:01) or (BBB:01 and XXX:01) or (BBB:01 and YYY:01)"
     );
     expect(parsed.expression).not.toBeNull();
 

@@ -86,7 +86,7 @@ describe("canonicalizeExpression", () => {
   });
 
   it("should sort AND terms alphabetically", () => {
-    const result = parseExpression("+ZZZ01 and +AAA01");
+    const result = parseExpression("ZZZ:01 and AAA:01");
     expect(result.expression).not.toBeNull();
     const canonical = canonicalizeExpression(result.expression!);
     // After canonicalization the key for AAA should come first

@@ -4,6 +4,7 @@ import { ParseDiagnostic, VariableSign } from "./types";
 /** Token categories in the lexer output. */
 export enum TokenType {
   Variable = "Variable",
+  In = "In",
   And = "And",
   Or = "Or",
   LParen = "LParen",
@@ -18,6 +19,7 @@ export interface Token {
   readonly sign?: VariableSign;
   readonly code?: string;
   readonly value?: string;
+  readonly values?: readonly string[];
   readonly start: number;
   readonly end: number;
 }
@@ -30,6 +32,8 @@ export interface LexResult {
 
 const KEYWORD_PATTERN = /and|or/iy;
 const VARIABLE_PATTERN = /[+-][A-Za-z0-9]{4,5}/y;
+const EXPLICIT_VARIABLE_PATTERN = /[A-Za-z0-9]{3}[:!][A-Za-z0-9]{1,2}/y;
+const IN_EXPRESSION_PATTERN = /[A-Za-z0-9]{3}[:!]\([^)]*\)/y;
 
 /**
  * Parses a sign+code+value token string into its components.
@@ -44,6 +48,36 @@ function parseVariable(raw: string): { sign: VariableSign; code: string; value: 
   const code = body.slice(0, 3);
   const value = body.slice(3);
   return { sign, code, value };
+}
+
+/**
+ * Parses an explicit-syntax variable token (CODE:VALUE or CODE!VALUE) into its components.
+ *
+ * @param raw Variable token text in explicit form.
+ * @returns Parsed sign, code, and value segments.
+ */
+function parseExplicitVariable(raw: string): { sign: VariableSign; code: string; value: string } {
+  const code = raw.slice(0, 3).toUpperCase();
+  const sign = raw[3] === ":" ? VariableSign.Equals : VariableSign.NotEquals;
+  const value = raw.slice(4).toUpperCase();
+  return { sign, code, value };
+}
+
+/**
+ * Parses an IN-expression token (CODE:(V1 V2) or CODE!(V1 V2)) into its components.
+ *
+ * @param raw Full IN-expression text including parentheses.
+ * @returns Parsed sign, code, and array of values.
+ */
+function parseInExpression(raw: string): { sign: VariableSign; code: string; values: string[] } {
+  const code = raw.slice(0, 3).toUpperCase();
+  const sign = raw[3] === ":" ? VariableSign.Equals : VariableSign.NotEquals;
+  const inner = raw.slice(5, -1);
+  const values = inner
+    .split(/\s+/)
+    .filter((v) => v.length > 0)
+    .map((v) => v.toUpperCase());
+  return { sign, code, values };
 }
 
 /**
@@ -77,13 +111,40 @@ function tokenizeExplicit(input: string): LexResult {
       continue;
     }
 
-    KEYWORD_PATTERN.lastIndex = index;
-    const kwMatch = KEYWORD_PATTERN.exec(input);
-    if (kwMatch) {
-      const raw = kwMatch[0];
-      const upper = raw.toUpperCase();
+    IN_EXPRESSION_PATTERN.lastIndex = index;
+    const inMatch = IN_EXPRESSION_PATTERN.exec(input);
+    if (inMatch) {
+      const raw = inMatch[0];
+      const { sign, code, values } = parseInExpression(raw);
+      if (values.length === 0) {
+        diagnostics.push({
+          message: "Empty IN expression.",
+          span: { start: index, end: index + raw.length },
+        });
+      } else {
+        tokens.push({
+          type: TokenType.In,
+          sign,
+          code,
+          values,
+          start: index,
+          end: index + raw.length,
+        });
+      }
+      index += raw.length;
+      continue;
+    }
+
+    EXPLICIT_VARIABLE_PATTERN.lastIndex = index;
+    const varMatch = EXPLICIT_VARIABLE_PATTERN.exec(input);
+    if (varMatch) {
+      const raw = varMatch[0];
+      const { sign, code, value } = parseExplicitVariable(raw);
       tokens.push({
-        type: upper === "AND" ? TokenType.And : TokenType.Or,
+        type: TokenType.Variable,
+        sign,
+        code,
+        value,
         start: index,
         end: index + raw.length,
       });
@@ -91,16 +152,13 @@ function tokenizeExplicit(input: string): LexResult {
       continue;
     }
 
-    VARIABLE_PATTERN.lastIndex = index;
-    const varMatch = VARIABLE_PATTERN.exec(input);
-    if (varMatch) {
-      const raw = varMatch[0];
-      const { sign, code, value } = parseVariable(raw);
+    KEYWORD_PATTERN.lastIndex = index;
+    const kwMatch = KEYWORD_PATTERN.exec(input);
+    if (kwMatch) {
+      const raw = kwMatch[0];
+      const upper = raw.toUpperCase();
       tokens.push({
-        type: TokenType.Variable,
-        sign,
-        code,
-        value,
+        type: upper === "AND" ? TokenType.And : TokenType.Or,
         start: index,
         end: index + raw.length,
       });

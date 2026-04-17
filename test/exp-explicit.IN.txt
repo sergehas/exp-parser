@@ -1,0 +1,2 @@
+ABC:01 and XYZ!02
+or ABC:01 and DEF:(03 02 04)

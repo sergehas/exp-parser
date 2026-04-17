@@ -2,27 +2,35 @@ import { SyntaxMode, detectSyntax } from "./detect";
 
 describe("detectSyntax", () => {
   it("should detect explicit syntax with 'and' keyword", () => {
-    expect(detectSyntax("+ABC01 and -XYZ02")).toBe(SyntaxMode.Explicit);
+    expect(detectSyntax("ABC:01 and XYZ!02")).toBe(SyntaxMode.Explicit);
   });
 
   it("should detect explicit syntax with 'or' keyword", () => {
-    expect(detectSyntax("+ABC01 or -XYZ02")).toBe(SyntaxMode.Explicit);
+    expect(detectSyntax("ABC:01 or XYZ!02")).toBe(SyntaxMode.Explicit);
   });
 
   it("should detect explicit syntax with 'AND' (case-insensitive)", () => {
-    expect(detectSyntax("+ABC01 AND -XYZ02")).toBe(SyntaxMode.Explicit);
+    expect(detectSyntax("ABC:01 AND XYZ!02")).toBe(SyntaxMode.Explicit);
   });
 
   it("should detect explicit syntax with 'Or' (mixed case)", () => {
-    expect(detectSyntax("+ABC01 Or -XYZ02")).toBe(SyntaxMode.Explicit);
+    expect(detectSyntax("ABC:01 Or XYZ!02")).toBe(SyntaxMode.Explicit);
   });
 
   it("should detect explicit syntax with parentheses", () => {
-    expect(detectSyntax("(+ABC01)")).toBe(SyntaxMode.Explicit);
+    expect(detectSyntax("(ABC:01)")).toBe(SyntaxMode.Explicit);
   });
 
   it("should detect explicit syntax with closing parenthesis", () => {
-    expect(detectSyntax("+ABC01)")).toBe(SyntaxMode.Explicit);
+    expect(detectSyntax("ABC:01)")).toBe(SyntaxMode.Explicit);
+  });
+
+  it("should detect explicit syntax with colon variable format", () => {
+    expect(detectSyntax("ABC:01")).toBe(SyntaxMode.Explicit);
+  });
+
+  it("should detect explicit syntax with bang variable format", () => {
+    expect(detectSyntax("XYZ!02")).toBe(SyntaxMode.Explicit);
   });
 
   it("should detect condensed syntax without keywords or parens", () => {
@@ -44,6 +52,6 @@ describe("detectSyntax", () => {
   });
 
   it("should detect explicit when 'and' is standalone word", () => {
-    expect(detectSyntax("+ABC01 and +DEF02")).toBe(SyntaxMode.Explicit);
+    expect(detectSyntax("ABC:01 and DEF:02")).toBe(SyntaxMode.Explicit);
   });
 });
