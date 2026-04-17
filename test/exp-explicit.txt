@@ -1,4 +1,4 @@
-AB:C01 and XYZ:02
+ABC:01 and XYZ:02
 and DEF:03 and GHI:04
 and ABC:01 and XYZ!03
 and ABC:01 and XYZ!04

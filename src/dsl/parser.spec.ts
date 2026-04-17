@@ -199,7 +199,7 @@ describe("stringifyExpression — condensed mode", () => {
     expect(str).toBe("+ABC01");
   });
 
-  it("should use explicit fallback when an AND term still contains OR", () => {
+  it("should expand OR-inside-AND to DNF when stringifying condensed", () => {
     const expression: BoolExpr = {
       kind: ExprKind.Binary,
       operator: BinaryOperator.And,
@@ -233,8 +233,11 @@ describe("stringifyExpression — condensed mode", () => {
     };
 
     const str = stringifyExpression(expression, SyntaxMode.Condensed);
-    expect(str).toContain("(ABC:01 or XYZ!02)");
-    expect(str).toContain("+DEF03");
+    // DNF expansion: (ABC:01 OR XYZ!02) AND DEF:03 → (ABC:01 AND DEF:03) OR (XYZ!02 AND DEF:03)
+    const lines = str.split("\n");
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toBe("+ABC01 +DEF03");
+    expect(lines[1]).toBe("-XYZ02 +DEF03");
   });
 
   it("should stringify AND as space-separated", () => {
@@ -277,6 +280,108 @@ describe("roundtrip: parse → stringify → parse", () => {
     });
   }
 });
+
+describe("parseExpression — IN syntax", () => {
+  it("should parse equals IN as OR-chain", () => {
+    const result = parseExpression("ABC:(A0 A3 B4)");
+    expect(result.diagnostics).toHaveLength(0);
+    expect(result.expression).not.toBeNull();
+    // Top-level should be OR
+    if (isBinaryExpr(result.expression!)) {
+      expect(result.expression.operator).toBe(BinaryOperator.Or);
+    }
+  });
+
+  it("should parse not-equals IN as AND-chain", () => {
+    const result = parseExpression("ABC!(A0 A3)");
+    expect(result.diagnostics).toHaveLength(0);
+    expect(result.expression).not.toBeNull();
+    if (isBinaryExpr(result.expression!)) {
+      expect(result.expression.operator).toBe(BinaryOperator.And);
+    }
+  });
+
+  it("should parse single-value IN as single variable", () => {
+    const result = parseExpression("ABC:(A0)");
+    expect(result.diagnostics).toHaveLength(0);
+    expect(result.expression).not.toBeNull();
+    if (isVariableExpr(result.expression!)) {
+      expect(result.expression.code).toBe("ABC");
+      expect(result.expression.sign).toBe(VariableSign.Equals);
+      expect(result.expression.value).toBe("A0");
+    }
+  });
+
+  it("should parse IN combined with AND operator", () => {
+    const result = parseExpression("XYZ:01 and ABC:(A0 A3)");
+    expect(result.diagnostics).toHaveLength(0);
+    expect(result.expression).not.toBeNull();
+    // Top-level should be AND (AND binds tighter than the OR inside IN)
+    if (isBinaryExpr(result.expression!)) {
+      expect(result.expression.operator).toBe(BinaryOperator.And);
+    }
+  });
+
+  it("should emit diagnostic for empty IN", () => {
+    const result = parseExpression("ABC:()");
+    expect(result.expression).toBeNull();
+    expect(result.diagnostics.length).toBeGreaterThan(0);
+  });
+});
+
+describe("stringifyExpression — IN folding", () => {
+  it("should fold same-code Equals OR-chain into IN syntax", () => {
+    const result = parseExpression("ABC:01 or ABC:A3 or ABC:B4");
+    const str = stringifyExpression(result.expression!, SyntaxMode.Explicit);
+    expect(str).toBe("ABC:(01 A3 B4)");
+  });
+
+  it("should fold same-code NotEquals AND-chain into IN syntax", () => {
+    const result = parseExpression("ABC!01 and ABC!A3");
+    const str = stringifyExpression(result.expression!, SyntaxMode.Explicit);
+    expect(str).toBe("ABC!(01 A3)");
+  });
+
+  it("should not fold OR-chain with mixed codes", () => {
+    const result = parseExpression("ABC:01 or XYZ:02");
+    const str = stringifyExpression(result.expression!, SyntaxMode.Explicit);
+    expect(str).toBe("ABC:01 or XYZ:02");
+  });
+
+  it("should not fold OR-chain with NotEquals sign", () => {
+    const result = parseExpression("ABC!01 or ABC!02");
+    const str = stringifyExpression(result.expression!, SyntaxMode.Explicit);
+    expect(str).toBe("ABC!01 or ABC!02");
+  });
+
+  it("should not fold AND-chain with Equals sign", () => {
+    const result = parseExpression("ABC:01 and ABC:02");
+    const str = stringifyExpression(result.expression!, SyntaxMode.Explicit);
+    expect(str).toBe("ABC:01 and ABC:02");
+  });
+});
+
+describe("roundtrip: IN syntax", () => {
+  const inputs = [
+    "ABC:(A0 A3 B4)",
+    "ABC!(A0 A3)",
+    "XYZ:01 and ABC:(A0 A3)",
+    "ABC:(A0 A3) or DEF:01",
+  ];
+
+  for (const input of inputs) {
+    it(`should roundtrip IN: ${input}`, () => {
+      const parsed1 = parseExpression(input);
+      expect(parsed1.expression).not.toBeNull();
+      const str = stringifyExpression(parsed1.expression!, SyntaxMode.Explicit);
+      const parsed2 = parseExpression(str);
+      expect(parsed2.expression).not.toBeNull();
+      const str2 = stringifyExpression(parsed2.expression!, SyntaxMode.Explicit);
+      expect(str2).toBe(str);
+    });
+  }
+});
+
 //---------------------------------
 describe("parseExpression internals with mocked lexer", () => {
   afterEach(() => {

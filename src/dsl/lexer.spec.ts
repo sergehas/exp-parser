@@ -98,6 +98,70 @@ describe("tokenize — explicit mode", () => {
   });
 });
 
+describe("tokenize — explicit mode IN expressions", () => {
+  it("should tokenize an equals IN expression", () => {
+    const result = tokenize("ABC:(A0 A3 B4)", SyntaxMode.Explicit);
+    expect(result.diagnostics).toHaveLength(0);
+    expect(result.tokens).toHaveLength(2); // In + Eof
+    expect(result.tokens[0]).toMatchObject({
+      type: TokenType.In,
+      sign: VariableSign.Equals,
+      code: "ABC",
+      values: ["A0", "A3", "B4"],
+    });
+  });
+
+  it("should tokenize a not-equals IN expression", () => {
+    const result = tokenize("ABC!(A0 A3)", SyntaxMode.Explicit);
+    expect(result.diagnostics).toHaveLength(0);
+    expect(result.tokens[0]).toMatchObject({
+      type: TokenType.In,
+      sign: VariableSign.NotEquals,
+      code: "ABC",
+      values: ["A0", "A3"],
+    });
+  });
+
+  it("should normalize IN code and values to uppercase", () => {
+    const result = tokenize("abc:(a0 b1)", SyntaxMode.Explicit);
+    expect(result.diagnostics).toHaveLength(0);
+    expect(result.tokens[0]).toMatchObject({
+      code: "ABC",
+      values: ["A0", "B1"],
+    });
+  });
+
+  it("should tokenize a single-value IN expression", () => {
+    const result = tokenize("ABC:(A0)", SyntaxMode.Explicit);
+    expect(result.diagnostics).toHaveLength(0);
+    expect(result.tokens[0]).toMatchObject({
+      type: TokenType.In,
+      values: ["A0"],
+    });
+  });
+
+  it("should emit diagnostic for empty IN expression", () => {
+    const result = tokenize("ABC:()", SyntaxMode.Explicit);
+    expect(result.diagnostics).toHaveLength(1);
+    expect(result.diagnostics[0].message).toContain("Empty IN expression");
+  });
+
+  it("should tokenize IN expression combined with operators", () => {
+    const result = tokenize("ABC:(A0 A3) and XYZ:01", SyntaxMode.Explicit);
+    expect(result.diagnostics).toHaveLength(0);
+    const types = result.tokens.map((t) => t.type);
+    expect(types).toEqual([TokenType.In, TokenType.And, TokenType.Variable, TokenType.Eof]);
+  });
+
+  it("should handle extra whitespace inside IN parentheses", () => {
+    const result = tokenize("ABC:(  A0   B1  )", SyntaxMode.Explicit);
+    expect(result.diagnostics).toHaveLength(0);
+    expect(result.tokens[0]).toMatchObject({
+      values: ["A0", "B1"],
+    });
+  });
+});
+
 describe("tokenize — condensed mode", () => {
   it("should tokenize variables separated by spaces", () => {
     const result = tokenize("+ABC01 -XYZ02", SyntaxMode.Condensed);

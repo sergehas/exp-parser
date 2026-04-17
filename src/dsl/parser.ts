@@ -22,6 +22,7 @@ export interface ParseResult {
 
 const PRECEDENCE: Readonly<Record<TokenType, number>> = {
   [TokenType.Variable]: 0,
+  [TokenType.In]: 0,
   [TokenType.And]: 20,
   [TokenType.Or]: 10,
   [TokenType.LParen]: 0,
@@ -130,6 +131,11 @@ class ExplicitParser {
   private parsePrefix(): BoolExpr | null {
     const token = this.current();
 
+    if (token.type === TokenType.In) {
+      this.advance();
+      return this.buildInChain(token);
+    }
+
     if (token.type === TokenType.Variable) {
       this.advance();
       return {
@@ -170,6 +176,50 @@ class ExplicitParser {
       span: { start: token.start, end: token.end },
     });
     return null;
+  }
+
+  /**
+   * Builds an expression chain from an IN token.
+   * Equals sign produces an OR-chain; NotEquals sign produces an AND-chain.
+   *
+   * @param token The IN token containing code, sign, and values.
+   * @returns Desugared expression chain or null on error.
+   */
+  private buildInChain(token: Token): BoolExpr | null {
+    const code = token.code ?? "";
+    const sign = token.sign ?? VariableSign.Equals;
+    const values = token.values ?? [];
+    const span: SourceSpan = { start: token.start, end: token.end };
+
+    if (values.length === 0) {
+      this._diagnostics.push({
+        message: "Empty IN expression.",
+        span,
+      });
+      return null;
+    }
+
+    const exprs: BoolExpr[] = values.map((v) => ({
+      kind: ExprKind.Variable as const,
+      sign,
+      code,
+      value: v,
+      span,
+    }));
+
+    const operator = sign === VariableSign.Equals ? BinaryOperator.Or : BinaryOperator.And;
+
+    const [first, ...rest] = exprs;
+    return rest.reduce<BoolExpr>(
+      (acc, cur) => ({
+        kind: ExprKind.Binary,
+        operator,
+        left: acc,
+        right: cur,
+        span: mergeSpan(acc.span, cur.span),
+      }),
+      first
+    );
   }
 
   /**
@@ -372,6 +422,11 @@ function stringifyExplicit(expression: BoolExpr, parentPrecedence: number): stri
     return explicitVariableToString(expression.sign, expression.code, expression.value);
   }
 
+  const inResult = tryStringifyIn(expression);
+  if (inResult !== null) {
+    return inResult;
+  }
+
   const currentPrecedence = expression.operator === BinaryOperator.And ? 20 : 10;
   const left = stringifyExplicit(expression.left, currentPrecedence);
   const right = stringifyExplicit(expression.right, currentPrecedence + 1);
@@ -384,26 +439,128 @@ function stringifyExplicit(expression: BoolExpr, parentPrecedence: number): stri
 }
 
 /**
+ * Attempts to fold an expression into IN syntax (CODE:(V1 V2) or CODE!(V1 V2)).
+ * Folds OR-chains of same-code Equals variables and AND-chains of same-code NotEquals variables.
+ *
+ * @param expression Binary expression to attempt folding.
+ * @returns IN-syntax string if foldable, or null otherwise.
+ */
+function tryStringifyIn(expression: BoolExpr): string | null {
+  if (!isBinaryExpr(expression)) {
+    return null;
+  }
+
+  const isOrEquals = expression.operator === BinaryOperator.Or;
+  const isAndNotEquals = expression.operator === BinaryOperator.And;
+  if (!isOrEquals && !isAndNotEquals) {
+    return null;
+  }
+
+  const terms = collectBinaryTerms(expression, expression.operator);
+  if (terms.length < 2) {
+    return null;
+  }
+
+  if (terms.some((t) => isBinaryExpr(t))) {
+    return null;
+  }
+
+  const firstCode = terms[0].kind === ExprKind.Variable ? terms[0].code : null;
+  const firstSign = terms[0].kind === ExprKind.Variable ? terms[0].sign : null;
+
+  if (firstCode === null || firstSign === null) {
+    return null;
+  }
+
+  if (isOrEquals && firstSign !== VariableSign.Equals) {
+    return null;
+  }
+  if (isAndNotEquals && firstSign !== VariableSign.NotEquals) {
+    return null;
+  }
+
+  const allMatch = terms.every(
+    (t) => t.kind === ExprKind.Variable && t.code === firstCode && t.sign === firstSign
+  );
+  if (!allMatch) {
+    return null;
+  }
+
+  const values = terms.map((t) => (t.kind === ExprKind.Variable ? t.value.toUpperCase() : ""));
+  const separator = firstSign === VariableSign.Equals ? ":" : "!";
+  return `${firstCode.toUpperCase()}${separator}(${values.join(" ")})`;
+}
+
+/**
  * Stringifies an expression in condensed multiline syntax.
  *
  * @param expression Expression to stringify.
  * @returns Condensed string where lines represent OR terms.
  */
 function stringifyCondensed(expression: BoolExpr): string {
-  const orTerms = collectBinaryTerms(expression, BinaryOperator.Or);
+  const dnf = toDnf(expression);
+  const orTerms = collectBinaryTerms(dnf, BinaryOperator.Or);
   const lines = orTerms.map((term) => {
     const andTerms = collectBinaryTerms(term, BinaryOperator.And);
     return andTerms
-      .map((t) => {
-        if (!isBinaryExpr(t)) {
-          return variableToString(t.sign, t.code, t.value);
-        }
-        // Fallback: if a term is still binary (nested OR inside AND), use explicit notation
-        return `(${stringifyExplicit(t, 0)})`;
-      })
+      .filter((t) => !isBinaryExpr(t))
+      .map((t) => variableToString(t.sign, t.code, t.value))
       .join(" ");
   });
   return lines.join("\n");
+}
+
+/**
+ * Converts an expression to Disjunctive Normal Form (OR of ANDs) by distributing
+ * AND over OR. This ensures condensed output never needs to embed explicit syntax.
+ *
+ * @param expression Expression to normalize.
+ * @returns Equivalent expression in DNF.
+ */
+function toDnf(expression: BoolExpr): BoolExpr {
+  if (!isBinaryExpr(expression)) {
+    return expression;
+  }
+
+  const left = toDnf(expression.left);
+  const right = toDnf(expression.right);
+
+  if (expression.operator === BinaryOperator.Or) {
+    return { ...expression, left, right };
+  }
+
+  // AND: distribute over any OR on either side
+  const leftOrTerms = collectBinaryTerms(left, BinaryOperator.Or);
+  const rightOrTerms = collectBinaryTerms(right, BinaryOperator.Or);
+
+  if (leftOrTerms.length === 1 && rightOrTerms.length === 1) {
+    return { ...expression, left, right };
+  }
+
+  const products: BoolExpr[] = [];
+  for (const l of leftOrTerms) {
+    for (const r of rightOrTerms) {
+      products.push({
+        kind: ExprKind.Binary,
+        operator: BinaryOperator.And,
+        left: l,
+        right: r,
+        span: mergeSpan(l.span, r.span),
+      });
+    }
+  }
+
+  const [first, ...rest] = products;
+  return rest.reduce<BoolExpr>(
+    (acc, cur) => ({
+      kind: ExprKind.Binary,
+      operator: BinaryOperator.Or,
+      left: acc,
+      right: cur,
+      span: mergeSpan(acc.span, cur.span),
+    }),
+    first
+  );
 }
 
 /**
