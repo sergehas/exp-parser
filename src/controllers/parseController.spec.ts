@@ -94,7 +94,8 @@ describe("ParseController", () => {
     expect(logger.info).toHaveBeenCalledWith("Condensed:\ncondensed:Binary");
     expect(logger.info).toHaveBeenCalledWith("Expanded (DNF) : explicit:Variable");
     expect(logger.info).toHaveBeenCalledWith('  stats: {"rewrites":1,"maxDepth":2,"nodeCount":3}');
-    expect(logger.info).toHaveBeenCalledWith("Factorized : explicit:Variable");
+    expect(logger.info).toHaveBeenCalledWith("Expanded (CNF) : explicit:Variable");
+    expect(logger.info).toHaveBeenCalledWith("Factorized (explicit) : explicit:Variable");
     expect(logger.info).toHaveBeenCalledWith('  stats: {"rewrites":2,"maxDepth":3,"nodeCount":4}');
   });
 });

@@ -9,11 +9,13 @@ import {
   BinaryOperator,
   BoolExpr,
   ExprKind,
+  isBinaryExpr,
+  isVariableExpr,
   NormalForm,
   RewriteLimits,
   RewriteStats,
   SourceSpan,
-  isBinaryExpr,
+  VariableSign,
 } from "./types";
 
 interface MutableRewriteStats {
@@ -297,7 +299,10 @@ function factorizeOuter(
   const best = [...frequency.values()]
     .filter((v) => v.count >= 2)
     .sort(
-      (a, b) => b.count - a.count || expressionKey(a.expr).localeCompare(expressionKey(b.expr))
+      (a, b) =>
+        b.count - a.count ||
+        factorPriority(a.expr) - factorPriority(b.expr) ||
+        expressionKey(a.expr).localeCompare(expressionKey(b.expr))
     )[0];
   if (best === undefined) {
     return null;
@@ -343,6 +348,31 @@ function factorizeOuter(
   }
 
   return buildChain([...otherTerms, factoredGroup], outerOperator);
+}
+
+/**
+ * Prioritizes common-factor candidates by variable sign semantics.
+ *
+ * Priority order: Equals (`in`) first, NotEquals (`not in`) second,
+ * then all non-variable expressions.
+ *
+ * @param expression Candidate factor expression.
+ * @returns Lower numbers indicate higher priority.
+ */
+function factorPriority(expression: BoolExpr): number {
+  if (!isVariableExpr(expression)) {
+    return 2;
+  }
+
+  if (expression.sign === VariableSign.Equals) {
+    return 0;
+  }
+
+  if (expression.sign === VariableSign.NotEquals) {
+    return 1;
+  }
+
+  return 2;
 }
 
 // ---------------------------------------------------------------------------

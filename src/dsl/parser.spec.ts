@@ -427,4 +427,126 @@ describe("parseExpression internals with mocked lexer", () => {
 
     expect(() => parseExpression("ignored")).toThrow();
   });
+
+  it("should default missing IN token fields and emit diagnostic for empty values", () => {
+    jest.spyOn(detect, "detectSyntax").mockReturnValue(SyntaxMode.Explicit);
+    jest.spyOn(lexer, "tokenize").mockImplementation(() => ({
+      tokens: [
+        {
+          type: TokenType.In,
+          start: 0,
+          end: 5,
+          // code, sign, values intentionally omitted
+        },
+        {
+          type: TokenType.Eof,
+          start: 5,
+          end: 5,
+        },
+      ],
+      diagnostics: [],
+    }));
+
+    const result = parseExpression("ignored");
+
+    expect(result.expression).toBeNull();
+    expect(result.diagnostics).toContainEqual(
+      expect.objectContaining({ message: "Empty IN expression." })
+    );
+  });
+
+  it("should default missing condensed token fields via nullish coalescing", () => {
+    jest.spyOn(detect, "detectSyntax").mockReturnValue(SyntaxMode.Condensed);
+    jest.spyOn(lexer, "tokenize").mockImplementation(() => ({
+      tokens: [
+        {
+          type: TokenType.Variable,
+          start: 0,
+          end: 3,
+          // sign, code, value intentionally omitted
+        },
+        {
+          type: TokenType.Eof,
+          start: 3,
+          end: 3,
+        },
+      ],
+      diagnostics: [],
+    }));
+
+    const result = parseExpression("ignored");
+
+    expect(result.diagnostics).toHaveLength(0);
+    expect(result.expression).not.toBeNull();
+    expect(result.expression).toMatchObject({
+      kind: ExprKind.Variable,
+      sign: VariableSign.Equals,
+      code: "",
+      value: "",
+    });
+  });
+
+  it("should handle consecutive newlines in condensed mode", () => {
+    jest.spyOn(detect, "detectSyntax").mockReturnValue(SyntaxMode.Condensed);
+    jest.spyOn(lexer, "tokenize").mockImplementation(() => ({
+      tokens: [
+        {
+          type: TokenType.Variable,
+          sign: VariableSign.Equals,
+          code: "ABC",
+          value: "01",
+          start: 0,
+          end: 6,
+        },
+        { type: TokenType.Newline, start: 6, end: 7 },
+        { type: TokenType.Newline, start: 7, end: 8 },
+        {
+          type: TokenType.Variable,
+          sign: VariableSign.NotEquals,
+          code: "XYZ",
+          value: "02",
+          start: 8,
+          end: 14,
+        },
+        { type: TokenType.Eof, start: 14, end: 14 },
+      ],
+      diagnostics: [],
+    }));
+
+    const result = parseExpression("ignored");
+
+    expect(result.diagnostics).toHaveLength(0);
+    expect(result.expression).not.toBeNull();
+    if (isBinaryExpr(result.expression!)) {
+      expect(result.expression.operator).toBe(BinaryOperator.Or);
+    }
+  });
+
+  it("should use fallback when current token index exceeds array bounds", () => {
+    jest.spyOn(detect, "detectSyntax").mockReturnValue(SyntaxMode.Explicit);
+    jest.spyOn(lexer, "tokenize").mockImplementation(() => ({
+      tokens: [
+        {
+          type: TokenType.Variable,
+          sign: VariableSign.Equals,
+          code: "ABC",
+          value: "01",
+          start: 0,
+          end: 6,
+        },
+        // Missing Eof — forces parser to rely on at(-1) fallback
+      ],
+      diagnostics: [],
+    }));
+
+    const result = parseExpression("ignored");
+
+    // Parser reads variable, then tries to get next token.
+    // tokens[1] is undefined, fallback to tokens.at(-1) which is the Variable token.
+    // Variable token is not And/Or so loop breaks, then checks for Eof which fails.
+    expect(result.expression).toBeNull();
+    expect(result.diagnostics).toContainEqual(
+      expect.objectContaining({ message: "Unexpected trailing token." })
+    );
+  });
 });

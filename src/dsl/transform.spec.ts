@@ -285,6 +285,23 @@ function makeSimpleBin(operator: BinaryOperator, left: BoolExpr, right: BoolExpr
   };
 }
 
+function findFactoredCommonFactor(expression: BoolExpr): BoolExpr | null {
+  if (
+    expression.kind === ExprKind.Binary &&
+    expression.operator === BinaryOperator.And &&
+    expression.right.kind === ExprKind.Binary &&
+    expression.right.operator === BinaryOperator.Or
+  ) {
+    return expression.left;
+  }
+
+  if (expression.kind === ExprKind.Binary) {
+    return findFactoredCommonFactor(expression.left) ?? findFactoredCommonFactor(expression.right);
+  }
+
+  return null;
+}
+
 describe("transform internals with mocked normalize behavior", () => {
   afterEach(() => {
     jest.clearAllMocks();
@@ -397,6 +414,132 @@ describe("transform internals with mocked normalize behavior", () => {
     const result = factorizeExpression(outer);
 
     expect(result.stats.rewrites).toBe(0);
+  });
+
+  it("should prioritize in over not in when tie-breaking common factors", async () => {
+    const inFactor = makeVar(VariableSign.Equals, "ZZZ", "01");
+    const notInFactor = makeVar(VariableSign.NotEquals, "AAA", "01");
+    const x1 = makeNamedVar("X1");
+    const x2 = makeNamedVar("X2");
+    const y1 = makeNamedVar("Y1");
+    const y2 = makeNamedVar("Y2");
+    const t1 = makeNamedVar("T1");
+    const t2 = makeNamedVar("T2");
+    const t3 = makeNamedVar("T3");
+    const t4 = makeNamedVar("T4");
+    const outer = makeSimpleBin(BinaryOperator.Or, t1, t2);
+
+    jest.spyOn(normalize, "canonicalizeExpression").mockImplementation((expr: BoolExpr) => expr);
+    jest.spyOn(normalize, "expressionKey").mockImplementation((expr: BoolExpr) => {
+      if (expr === inFactor) {
+        return "Z";
+      }
+      if (expr === notInFactor) {
+        return "A";
+      }
+      if (expr === x1) {
+        return "X1";
+      }
+      if (expr === x2) {
+        return "X2";
+      }
+      if (expr === y1) {
+        return "Y1";
+      }
+      if (expr === y2) {
+        return "Y2";
+      }
+      return "T";
+    });
+    jest
+      .spyOn(normalize, "extractTerms")
+      .mockImplementation((expr: BoolExpr, operator: BinaryOperator) => {
+        if (operator === BinaryOperator.Or) {
+          return [t1, t2, t3, t4];
+        }
+        if (operator === BinaryOperator.And && expr === t1) {
+          return [inFactor, x1];
+        }
+        if (operator === BinaryOperator.And && expr === t2) {
+          return [inFactor, x2];
+        }
+        if (operator === BinaryOperator.And && expr === t3) {
+          return [notInFactor, y1];
+        }
+        if (operator === BinaryOperator.And && expr === t4) {
+          return [notInFactor, y2];
+        }
+        return [expr];
+      });
+
+    const result = factorizeExpression(outer);
+    const commonFactor = findFactoredCommonFactor(result.expression);
+
+    expect(result.stats.rewrites).toBeGreaterThan(0);
+    expect(commonFactor).toBe(inFactor);
+  });
+
+  it("should keep lexical tie-break when sign priority is equal", async () => {
+    const bFactor = makeVar(VariableSign.Equals, "BBB", "01");
+    const cFactor = makeVar(VariableSign.Equals, "CCC", "01");
+    const x1 = makeNamedVar("X1");
+    const x2 = makeNamedVar("X2");
+    const y1 = makeNamedVar("Y1");
+    const y2 = makeNamedVar("Y2");
+    const t1 = makeNamedVar("T1");
+    const t2 = makeNamedVar("T2");
+    const t3 = makeNamedVar("T3");
+    const t4 = makeNamedVar("T4");
+    const outer = makeSimpleBin(BinaryOperator.Or, t1, t2);
+
+    jest.spyOn(normalize, "canonicalizeExpression").mockImplementation((expr: BoolExpr) => expr);
+    jest.spyOn(normalize, "expressionKey").mockImplementation((expr: BoolExpr) => {
+      if (expr === bFactor) {
+        return "B";
+      }
+      if (expr === cFactor) {
+        return "C";
+      }
+      if (expr === x1) {
+        return "X1";
+      }
+      if (expr === x2) {
+        return "X2";
+      }
+      if (expr === y1) {
+        return "Y1";
+      }
+      if (expr === y2) {
+        return "Y2";
+      }
+      return "T";
+    });
+    jest
+      .spyOn(normalize, "extractTerms")
+      .mockImplementation((expr: BoolExpr, operator: BinaryOperator) => {
+        if (operator === BinaryOperator.Or) {
+          return [t1, t2, t3, t4];
+        }
+        if (operator === BinaryOperator.And && expr === t1) {
+          return [bFactor, x1];
+        }
+        if (operator === BinaryOperator.And && expr === t2) {
+          return [bFactor, x2];
+        }
+        if (operator === BinaryOperator.And && expr === t3) {
+          return [cFactor, y1];
+        }
+        if (operator === BinaryOperator.And && expr === t4) {
+          return [cFactor, y2];
+        }
+        return [expr];
+      });
+
+    const result = factorizeExpression(outer);
+    const commonFactor = findFactoredCommonFactor(result.expression);
+
+    expect(result.stats.rewrites).toBeGreaterThan(0);
+    expect(commonFactor).toBe(bFactor);
   });
 
   it("should hit remaining-length-zero path when a term equals the common factor", async () => {

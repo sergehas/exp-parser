@@ -47,7 +47,12 @@ export class ParseController extends AbstractController<ParseContext> {
     logger.info(`  stats: ${JSON.stringify(expanded2.stats)}`);
 
     const factorized = factorizeExpression(ast);
-    logger.info(`Factorized : ${stringifyExpression(factorized.expression, SyntaxMode.Explicit)}`);
+    logger.info(
+      `Factorized (explicit) : ${stringifyExpression(factorized.expression, SyntaxMode.Explicit)}`
+    );
+    logger.info(
+      `Factorized (condensed) : ${stringifyExpression(factorized.expression, SyntaxMode.Condensed)}`
+    );
     logger.info(`  stats: ${JSON.stringify(factorized.stats)}`);
   }
 }
