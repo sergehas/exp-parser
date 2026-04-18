@@ -4,7 +4,7 @@ export enum SyntaxMode {
   Explicit = "Explicit",
 }
 
-const EXPLICIT_PATTERN = /\b(and|or)\b|[()]|[A-Za-z0-9]{3}[:!][A-Za-z0-9]{1,2}/i;
+const EXPLICIT_PATTERN = /\b(and|or)\b|[()]|[a-z0-9]{3}[:!][a-z0-9]{1,2}/i;
 
 /**
  * Detects whether input is written in condensed or explicit boolean syntax.

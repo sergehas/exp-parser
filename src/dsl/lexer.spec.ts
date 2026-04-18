@@ -35,7 +35,7 @@ describe("tokenize — explicit mode", () => {
   });
 
   it("should tokenize 'and' and 'or' keywords (case-insensitive)", () => {
-    const result = tokenize("ABC:01 AND XYZ!02 or DEF:03", SyntaxMode.Explicit);
+    const result = tokenize("abc:01 AND XYZ!qq or DEF:03", SyntaxMode.Explicit);
     expect(result.diagnostics).toHaveLength(0);
     const types = result.tokens.map((t) => t.type);
     expect(types).toEqual([

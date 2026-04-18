@@ -2,8 +2,10 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "outDir": "./out-tsc/app",
-    "types": ["node"]
+    "types": ["node"],
+    "tsBuildInfoFile": "./dist/.tsbuildinfo" /* "hide" build info from git" */,
+
+    "sourceMap": false
   },
   "files": ["src/main.ts"],
   "include": ["src/**/*.d.ts"]

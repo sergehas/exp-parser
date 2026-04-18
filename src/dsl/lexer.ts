@@ -31,9 +31,9 @@ export interface LexResult {
 }
 
 const KEYWORD_PATTERN = /and|or/iy;
-const VARIABLE_PATTERN = /[+-][A-Za-z0-9]{4,5}/y;
-const EXPLICIT_VARIABLE_PATTERN = /[A-Za-z0-9]{3}[:!][A-Za-z0-9]{1,2}/y;
-const IN_EXPRESSION_PATTERN = /[A-Za-z0-9]{3}[:!]\([^)]*\)/y;
+const VARIABLE_PATTERN = /[+-][a-z0-9]{4,5}/iy;
+const EXPLICIT_VARIABLE_PATTERN = /[a-z0-9]{3}[:!][a-z0-9]{1,2}/iy;
+const IN_EXPRESSION_PATTERN = /[a-z0-9]{3}[:!]\([^)]*\)/iy;
 
 /**
  * Parses a sign+code+value token string into its components.
@@ -81,6 +81,118 @@ function parseInExpression(raw: string): { sign: VariableSign; code: string; val
 }
 
 /**
+ * Attempts to match and tokenize a parenthesis ('(' or ')') at the given index.
+ *
+ * @param input The input string to tokenize.
+ * @param index The current position in the input string.
+ * @param tokens The array where matched tokens are added.
+ * @returns The new index after consuming the parenthesis, or the original index if no parenthesis was found.
+ */
+function tryMatchParenthesis(input: string, index: number, tokens: Token[]): number {
+  const ch = input[index];
+  if (ch === "(") {
+    tokens.push({ type: TokenType.LParen, start: index, end: index + 1 });
+    return index + 1;
+  }
+  if (ch === ")") {
+    tokens.push({ type: TokenType.RParen, start: index, end: index + 1 });
+    return index + 1;
+  }
+  return index;
+}
+
+/**
+ * Attempts to match and tokenize an IN expression at the given index.
+ *
+ * @param input The input string to tokenize.
+ * @param index The current position in the input string.
+ * @param tokens The array where matched tokens are added.
+ * @param diagnostics The array where parsing diagnostics are added.
+ * @returns The new index after consuming the IN expression, or the original index if no match was found.
+ */
+function tryMatchInExpression(
+  input: string,
+  index: number,
+  tokens: Token[],
+  diagnostics: ParseDiagnostic[]
+): number {
+  IN_EXPRESSION_PATTERN.lastIndex = index;
+  const match = IN_EXPRESSION_PATTERN.exec(input);
+  if (match) {
+    const raw = match[0];
+    const { sign, code, values } = parseInExpression(raw);
+    if (values.length === 0) {
+      diagnostics.push({
+        message: "Empty IN expression.",
+        span: { start: index, end: index + raw.length },
+      });
+    } else {
+      tokens.push({
+        type: TokenType.In,
+        sign,
+        code,
+        values,
+        start: index,
+        end: index + raw.length,
+      });
+    }
+    return index + raw.length;
+  }
+  return index;
+}
+
+/**
+ * Attempts to match and tokenize an explicit variable at the given index.
+ *
+ * @param input The input string to tokenize.
+ * @param index The current position in the input string.
+ * @param tokens The array where matched tokens are added.
+ * @returns The new index after consuming the variable, or the original index if no match was found.
+ */
+function tryMatchVariable(input: string, index: number, tokens: Token[]): number {
+  EXPLICIT_VARIABLE_PATTERN.lastIndex = index;
+  const match = EXPLICIT_VARIABLE_PATTERN.exec(input);
+  if (match) {
+    const raw = match[0];
+    const { sign, code, value } = parseExplicitVariable(raw);
+    tokens.push({
+      type: TokenType.Variable,
+      sign,
+      code,
+      value,
+      start: index,
+      end: index + raw.length,
+    });
+    return index + raw.length;
+  }
+  return index;
+}
+
+/**
+ * Attempts to match and tokenize a keyword ('and' or 'or') at the given index.
+ *
+ * @param input The input string to tokenize.
+ * @param index The current position in the input string.
+ * @param tokens The array where matched tokens are added.
+ * @returns The new index after consuming the keyword, or the original index if no match was found.
+ */
+function tryMatchKeyword(input: string, index: number, tokens: Token[]): number {
+  KEYWORD_PATTERN.lastIndex = index;
+  const match = KEYWORD_PATTERN.exec(input);
+  if (match) {
+    const raw = match[0];
+    const upper = raw.toUpperCase();
+    tokens.push({
+      type: upper === "AND" ? TokenType.And : TokenType.Or,
+      start: index,
+      end: index + raw.length,
+    });
+    return index + raw.length;
+  }
+  return index;
+}
+
+/**
  * Tokenizes input using explicit syntax rules (keywords and parentheses supported).
  *
  * @param input Raw expression text.
@@ -99,70 +211,27 @@ function tokenizeExplicit(input: string): LexResult {
       continue;
     }
 
-    if (ch === "(") {
-      tokens.push({ type: TokenType.LParen, start: index, end: index + 1 });
-      index += 1;
+    let newIndex = tryMatchParenthesis(input, index, tokens);
+    if (newIndex > index) {
+      index = newIndex;
       continue;
     }
 
-    if (ch === ")") {
-      tokens.push({ type: TokenType.RParen, start: index, end: index + 1 });
-      index += 1;
+    newIndex = tryMatchInExpression(input, index, tokens, diagnostics);
+    if (newIndex > index) {
+      index = newIndex;
       continue;
     }
 
-    IN_EXPRESSION_PATTERN.lastIndex = index;
-    const inMatch = IN_EXPRESSION_PATTERN.exec(input);
-    if (inMatch) {
-      const raw = inMatch[0];
-      const { sign, code, values } = parseInExpression(raw);
-      if (values.length === 0) {
-        diagnostics.push({
-          message: "Empty IN expression.",
-          span: { start: index, end: index + raw.length },
-        });
-      } else {
-        tokens.push({
-          type: TokenType.In,
-          sign,
-          code,
-          values,
-          start: index,
-          end: index + raw.length,
-        });
-      }
-      index += raw.length;
+    newIndex = tryMatchVariable(input, index, tokens);
+    if (newIndex > index) {
+      index = newIndex;
       continue;
     }
 
-    EXPLICIT_VARIABLE_PATTERN.lastIndex = index;
-    const varMatch = EXPLICIT_VARIABLE_PATTERN.exec(input);
-    if (varMatch) {
-      const raw = varMatch[0];
-      const { sign, code, value } = parseExplicitVariable(raw);
-      tokens.push({
-        type: TokenType.Variable,
-        sign,
-        code,
-        value,
-        start: index,
-        end: index + raw.length,
-      });
-      index += raw.length;
-      continue;
-    }
-
-    KEYWORD_PATTERN.lastIndex = index;
-    const kwMatch = KEYWORD_PATTERN.exec(input);
-    if (kwMatch) {
-      const raw = kwMatch[0];
-      const upper = raw.toUpperCase();
-      tokens.push({
-        type: upper === "AND" ? TokenType.And : TokenType.Or,
-        start: index,
-        end: index + raw.length,
-      });
-      index += raw.length;
+    newIndex = tryMatchKeyword(input, index, tokens);
+    if (newIndex > index) {
+      index = newIndex;
       continue;
     }
 
