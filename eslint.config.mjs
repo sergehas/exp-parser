@@ -12,7 +12,7 @@ export default defineConfig([
     ".husky",
     ".vscode/",
     "dist/",
-    "coverage/",
+    "coverage/"
   ]),
 
   prettierConfig,

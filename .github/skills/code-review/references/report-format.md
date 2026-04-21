@@ -4,7 +4,7 @@ Use this exact structure for every code review output.
 
 ## Template
 
-```markdown
+````markdown
 # Code Review Report
 
 **Scope**: `{branch/PR/files}`
@@ -14,12 +14,12 @@ Use this exact structure for every code review output.
 
 ## Automated Checks
 
-| Check | Command | Result |
-|------|---------|--------|
-| Tests | `npm test` | `{pass/fail/not-run}` |
-| Build | `npm run build` | `{pass/fail/not-run}` |
-| Formatting | `npx prettier --check .` | `{pass/fail/not-run}` |
-| Lint (optional) | `npx eslint . --ext js,ts,json --quiet` | `{pass/fail/not-run}` |
+| Check           | Command                                   | Result                |
+| --------------- | ----------------------------------------- | --------------------- |
+| Tests           | `npm test`                                | `{pass/fail/not-run}` |
+| Build           | `npm run build`                           | `{pass/fail/not-run}` |
+| Formatting      | `npx prettier --check . --ignore-unknown` | `{pass/fail/not-run}` |
+| Lint (optional) | `npx eslint . --ext js,ts,json --quiet`   | `{pass/fail/not-run}` |
 
 ---
 
@@ -28,10 +28,12 @@ Use this exact structure for every code review output.
 > Must fix before merge.
 
 ### CR-{n}: {short title}
+
 - **File**: `{path}:{line}`
 - **Rule**: {which axis/rule is violated}
 - **Issue**: {description}
 - **Fix**:
+
 ```{lang}
 {corrected code}
 ```
@@ -93,7 +95,7 @@ Use this exact structure for every code review output.
 ## Checklist Summary
 
 | Axis            | Status        | Findings |
-|-----------------|---------------|----------|
+| --------------- | ------------- | -------- |
 | Architecture    | {pass/issues} | {count}  |
 | Testing         | {pass/issues} | {count}  |
 | TypeScript      | {pass/issues} | {count}  |
@@ -109,17 +111,20 @@ Use this section only when all finding counts are zero.
 No blocking or non-blocking issues were identified in reviewed files.
 
 Residual risk:
+
 - {example: limited confidence due to unexecuted checks, missing integration test coverage, or API dependency not mocked}
 ```
 
+````
+
 ## Severity Definitions
 
-| Severity | Meaning | Action |
-|----------|---------|--------|
-| **Critical** | Security flaw, data corruption/loss risk, command contract breakage, unsafe transport setting | Must fix before merge |
-| **Major** | Incorrect behavior, missing error handling, missing tests for changed logic, architecture drift | Should fix before merge |
-| **Minor** | Maintainability/performance concern with low immediate impact | Fix when convenient |
-| **Nit** | Style, naming, formatting | Optional |
+| Severity     | Meaning                                                                                         | Action                  |
+| ------------ | ----------------------------------------------------------------------------------------------- | ----------------------- |
+| **Critical** | Security flaw, data corruption/loss risk, command contract breakage, unsafe transport setting   | Must fix before merge   |
+| **Major**    | Incorrect behavior, missing error handling, missing tests for changed logic, architecture drift | Should fix before merge |
+| **Minor**    | Maintainability/performance concern with low immediate impact                                   | Fix when convenient     |
+| **Nit**      | Style, naming, formatting                                                                       | Optional                |
 
 ## Rules
 
